@@ -17,7 +17,7 @@ const app = express();
 
 /* CORS Configuration */
 app.use(cors({
-  origin: "https://studystream-platform.vercel.app/",
+  origin: "https://studystream-platform.vercel.app",
   credentials: true
 }));
 
