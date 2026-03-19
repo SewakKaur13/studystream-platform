@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { quizStore } from "@/stores/quizStore";
-import { Quiz, Student, QuizAttempt } from "@/types/quiz";
+import { Quiz, Student, Question } from "@/types/quiz";
 import Navbar from "@/components/Navbar";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Clock, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import api from "@/api/axios";
 import { toast } from "sonner";
 
 const QuizPage = () => {
@@ -16,7 +16,10 @@ const QuizPage = () => {
   const student = user as Student;
   const navigate = useNavigate();
 
-  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [quiz, setQuiz] = useState<
+    (Quiz & { questions: Question[]; marksPerQuestion: number }) | null
+  >(null);
+  const [attemptId, setAttemptId] = useState<string>("");
   const [started, setStarted] = useState(false);
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -24,60 +27,100 @@ const QuizPage = () => {
   const [tabSwitches, setTabSwitches] = useState(0);
   const tabSwitchRef = useRef(0);
   const submittedRef = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [visited, setVisited] = useState<Record<string, boolean>>({});
 
+  /** Fetch quiz on mount (for Rules page) */
   useEffect(() => {
     if (!id) return;
-    if (quizStore.isLocked(id, student.id)) {
-      toast.error("This quiz is locked. Try again later.");
-      navigate("/dashboard");
-      return;
-    }
-    const q = quizStore.getQuiz(id);
-    if (q) {
-      setQuiz(quizStore.shuffleQuestions(q));
-      setTimeLeft(q.timeLimit * 60);
-    }
-  }, [id, student.id, navigate]);
 
-  const submitQuiz = useCallback((auto = false) => {
-    if (submittedRef.current || !quiz) return;
-    submittedRef.current = true;
+    const fetchQuiz = async () => {
+      try {
+        const res = await api.get(`/student/start-quiz/${id}`);
+        const data = res.data;
+        // Safety check
+        if (!data || !data.questions) {
+          toast.error("Invalid quiz data received");
+          navigate("/dashboard");
+          return;
+        }
 
-    let correct = 0;
-    quiz.questions.forEach((q) => {
-      if (answers[q.id] === q.correctAnswer) correct++;
-    });
-    const wrong = quiz.questions.length - correct;
-    const score = correct * quiz.marksPerQuestion;
-    const total = quiz.questions.length * quiz.marksPerQuestion;
-    const percentage = Math.round((score / total) * 100);
+        setAttemptId(data.attemptId);
 
-    const attempt: QuizAttempt = {
-      id: `att_${Date.now()}`,
-      quizId: quiz.id,
-      quizTitle: quiz.title,
-      studentId: student.id,
-      answers,
-      score,
-      totalMarks: total,
-      correctCount: correct,
-      wrongCount: wrong,
-      percentage,
-      completedAt: new Date().toISOString(),
-      autoSubmitted: auto,
+        setQuiz({
+          _id: data.quizId,
+          title: data.title,
+          marksPerQuestion: data.marksPerQuestion,
+          description: data.description || "",
+          questions: (data.questions || []).map((q: any) => ({
+            id: q._id,
+            text: q.questionText,
+            options: q.options,
+            correctAnswer: 0,
+          })),
+          totalQuestions: data.questions.length,
+          attempts: 0,
+          createdAt: new Date().toISOString(),
+          status: "active",
+        });
+
+        // FIXED TIMER
+        setTimeLeft((data.duration || 15) * 60);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err?.response?.data?.message || "Failed to load quiz");
+        navigate("/dashboard");
+      }
     };
 
-    quizStore.addAttempt(attempt);
+    fetchQuiz();
+  }, [id, navigate]);
 
-    if (auto) {
-      quizStore.lockQuiz(quiz.id, student.id, 1);
-      toast.error("Quiz auto-submitted due to tab switching!");
+  /** Save Answer */
+  const saveAnswer = async (questionId: string, optionIndex: number) => {
+    if (!attemptId) return;
+    try {
+      await api.post("/student/save-answer", {
+        attemptId,
+        questionId,
+        selectedOption: optionIndex,
+      });
+    } catch (err: any) {
+      toast.error("Failed to save answer");
     }
+  };
 
-    navigate(`/result/${attempt.id}`);
-  }, [quiz, answers, student.id, navigate]);
+  /** Submit Quiz */
+  const submitQuiz = useCallback(
+    async (auto = false) => {
+      if (submittedRef.current || !quiz || !attemptId) return;
 
-  // Timer
+      submittedRef.current = true;
+      setIsSubmitting(true);
+
+      try {
+        const res = await api.post("/student/submit-quiz", {
+          attemptId,
+          answers,
+          autoSubmitted: auto,
+        });
+
+        toast.success(
+          auto ? "Quiz auto-submitted!" : "Quiz submitted successfully",
+        );
+
+        navigate(`/result/${attemptId}`, { state: { result: res.data } });
+      } catch (err: any) {
+        toast.error("Failed to submit quiz");
+        submittedRef.current = false;
+        setIsSubmitting(false);
+      }
+    },
+    [quiz, answers, attemptId, navigate],
+  );
+
+  /** Timer */
   useEffect(() => {
     if (!started || !quiz) return;
     if (timeLeft <= 0) {
@@ -88,32 +131,111 @@ const QuizPage = () => {
     return () => clearInterval(timer);
   }, [started, timeLeft, quiz, submitQuiz]);
 
-  // Tab switch detection
+  /** Enable fullscreen when quiz starts */
   useEffect(() => {
-    if (!started) return;
-    const handler = () => {
-      if (document.hidden) {
-        tabSwitchRef.current += 1;
-        setTabSwitches(tabSwitchRef.current);
-        if (tabSwitchRef.current >= 3) {
-          submitQuiz(true);
-        } else {
-          toast.warning(`Warning: Tab switch ${tabSwitchRef.current}/3. Quiz will auto-submit at 3.`);
+    if (started) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }, [started]);
+
+  /** Tab switch / focus loss detection */
+  useEffect(() => {
+    if (!started || !attemptId || !quiz) return;
+
+    const handleViolation = async () => {
+      tabSwitchRef.current += 1;
+      setTabSwitches(tabSwitchRef.current);
+
+      try {
+        // inform backend that tab switch happened
+        await api.post("/student/tab-switch", { attemptId });
+      } catch (err) {
+        console.error("Tab switch API failed", err);
+      }
+
+      // If student switches tabs 3 times
+      if (tabSwitchRef.current >= 3) {
+        try {
+          // call backend to lock quiz for 2 hours
+          await api.post("/student/lock-quiz", {
+            quizId: quiz._id,
+          });
+
+          toast.error(
+            "You switched tabs 3 times. Quiz locked for 2 hours and auto-submitted.",
+          );
+        } catch (err) {
+          console.error("Failed to lock quiz", err);
         }
+
+        // auto submit quiz
+        submitQuiz(true);
+      } else {
+        toast.warning(
+          `Warning: Tab switch ${tabSwitchRef.current}/3. Quiz will auto-submit at 3.`,
+        );
       }
     };
-    document.addEventListener("visibilitychange", handler);
-    return () => document.removeEventListener("visibilitychange", handler);
-  }, [started, submitQuiz]);
 
-  if (!quiz) return null;
+    /** Detect tab change */
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        handleViolation();
+      }
+    };
 
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
-  };
+    /** Detect window losing focus */
+    const handleBlur = () => {
+      handleViolation();
+    };
 
+    /** Detect exiting fullscreen */
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        handleViolation();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleBlur);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleBlur);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, [started, attemptId, quiz, submitQuiz]);
+  /** Track visited questions */
+  useEffect(() => {
+    if (!quiz || !started) return;
+
+    const qId = quiz.questions[currentQ]?.id;
+
+    if (qId) {
+      setVisited((prev) => ({
+        ...prev,
+        [qId]: true,
+      }));
+    }
+  }, [currentQ, quiz, started]);
+  /** Loading state */
+  if (!quiz) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="container max-w-2xl py-12">
+          <Card className="shadow-elevated">
+            <CardHeader>
+              <CardTitle className="text-2xl">Loading Quiz...</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  /** Rules page */
   if (!started) {
     return (
       <div className="min-h-screen bg-background">
@@ -125,12 +247,6 @@ const QuizPage = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">{quiz.description}</p>
-              <div className="flex flex-wrap gap-3">
-                <Badge variant="secondary"><Clock className="mr-1 h-3 w-3" />{quiz.timeLimit} minutes</Badge>
-                <Badge variant="secondary">{quiz.questions.length} questions</Badge>
-                <Badge variant="secondary">{quiz.marksPerQuestion} marks each</Badge>
-                <Badge variant="secondary">Total: {quiz.questions.length * quiz.marksPerQuestion} marks</Badge>
-              </div>
               <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 h-5 w-5 text-warning" />
@@ -139,14 +255,22 @@ const QuizPage = () => {
                     <ul className="mt-1 list-inside list-disc text-muted-foreground">
                       <li>Do not switch tabs during the quiz</li>
                       <li>After 3 tab switches, the quiz will auto-submit</li>
-                      <li>The quiz will also auto-submit when time runs out</li>
+                      <li>The quiz will auto-submit when time runs out</li>
                       <li>Questions are randomized for each attempt</li>
                     </ul>
                   </div>
                 </div>
               </div>
-              <Button size="lg" className="w-full gradient-hero text-primary-foreground" onClick={() => setStarted(true)}>
-                Start Quiz
+              <Button
+                size="lg"
+                disabled={starting}
+                className="w-full gradient-hero text-primary-foreground"
+                onClick={() => {
+                  setStarting(true);
+                  setStarted(true);
+                }}
+              >
+                {starting ? "Starting..." : "Start Quiz"}
               </Button>
             </CardContent>
           </Card>
@@ -155,64 +279,109 @@ const QuizPage = () => {
     );
   }
 
+  /** Current question */
   const q = quiz.questions[currentQ];
 
+  /** Format timer */
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  /** Quiz page */
   return (
     <div className="min-h-screen bg-background">
-      {/* Timer bar */}
+      {/* Timer & Progress */}
       <div className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
         <div className="container flex h-14 items-center justify-between">
           <span className="font-heading font-semibold">{quiz.title}</span>
           <div className="flex items-center gap-4">
             {tabSwitches > 0 && (
-              <Badge variant="destructive" className="text-xs">Warnings: {tabSwitches}/3</Badge>
+              <Badge variant="destructive" className="text-xs">
+                Warnings: {tabSwitches}/3
+              </Badge>
             )}
-            <Badge variant={timeLeft < 60 ? "destructive" : "secondary"} className="font-mono text-base px-3 py-1">
-              <Clock className="mr-1 h-4 w-4" />{formatTime(timeLeft)}
+            <Badge
+              variant={timeLeft < 60 ? "destructive" : "secondary"}
+              className="font-mono text-base px-3 py-1"
+            >
+              <Clock className="mr-1 h-4 w-4" /> {formatTime(timeLeft)}
             </Badge>
           </div>
         </div>
-        {/* Progress bar */}
         <div className="h-1 bg-muted">
-          <div className="h-full gradient-hero transition-all" style={{ width: `${((currentQ + 1) / quiz.questions.length) * 100}%` }} />
+          <div
+            className="h-full gradient-hero transition-all"
+            style={{
+              width: `${((currentQ + 1) / quiz.questions.length) * 100}%`,
+            }}
+          />
         </div>
       </div>
 
       <div className="container max-w-3xl py-8">
-        {/* Question navigation dots */}
-        <div className="mb-6 flex flex-wrap gap-2">
-          {quiz.questions.map((qq, i) => (
-            <button
-              key={qq.id}
-              onClick={() => setCurrentQ(i)}
-              className={`h-8 w-8 rounded-full text-xs font-medium transition-colors ${
-                i === currentQ
-                  ? "gradient-hero text-primary-foreground"
-                  : answers[qq.id] !== undefined
-                  ? "bg-primary/20 text-primary"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {i + 1}
-            </button>
-          ))}
-        </div>
+        <div className="mb-6">
+          <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2">
+            {quiz.questions.map((question, index) => {
+              const isAnswered = answers[question.id] !== undefined;
+              const isVisited = visited[question.id];
 
+              let bgColor = "bg-gray-200"; // not visited
+
+              if (isAnswered) {
+                bgColor = "bg-green-500 text-white";
+              } else if (isVisited) {
+                bgColor = "bg-red-500 text-white";
+              }
+
+              return (
+                <button
+                  key={question.id}
+                  onClick={() => setCurrentQ(index)}
+                  className={`w-10 h-10 rounded-md text-sm font-medium flex items-center justify-center ${bgColor} ${
+                    currentQ === index ? "ring-2 ring-primary" : ""
+                  }`}
+                >
+                  {index + 1}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div className="flex flex-wrap gap-4 mt-4 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-4 bg-green-500 rounded"></span>
+              Answered
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-4 bg-red-500 rounded"></span>
+              Visited
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-4 bg-gray-300 rounded"></span>
+              Not Visited
+            </div>
+          </div>
+        </div>
+        {/* Question */}
         <Card className="shadow-card">
           <CardHeader>
-            <p className="text-sm text-muted-foreground">Question {currentQ + 1} of {quiz.questions.length}</p>
+            <p className="text-sm text-muted-foreground">
+              Question {currentQ + 1} of {quiz.questions.length}
+            </p>
             <CardTitle className="text-xl">{q.text}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {q.options.map((opt, i) => (
+            {q.options?.map((opt, i) => (
               <button
                 key={i}
-                onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: i }))}
-                className={`w-full rounded-lg border p-4 text-left transition-all ${
-                  answers[q.id] === i
-                    ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                    : "border-border hover:border-primary/30 hover:bg-muted/50"
-                }`}
+                onClick={() => {
+                  setAnswers((prev) => ({ ...prev, [q.id]: i }));
+                  saveAnswer(q.id, i);
+                }}
+                className={`w-full rounded-lg border p-4 text-left transition-all ${answers[q.id] === i ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-border hover:border-primary/30 hover:bg-muted/50"}`}
               >
                 <span className="mr-3 inline-flex h-7 w-7 items-center justify-center rounded-full border text-sm font-medium">
                   {String.fromCharCode(65 + i)}
@@ -223,8 +392,13 @@ const QuizPage = () => {
           </CardContent>
         </Card>
 
+        {/* Navigation */}
         <div className="mt-6 flex items-center justify-between">
-          <Button variant="outline" disabled={currentQ === 0} onClick={() => setCurrentQ(currentQ - 1)}>
+          <Button
+            variant="outline"
+            disabled={currentQ === 0}
+            onClick={() => setCurrentQ(currentQ - 1)}
+          >
             <ChevronLeft className="mr-1 h-4 w-4" /> Previous
           </Button>
           {currentQ < quiz.questions.length - 1 ? (
@@ -232,8 +406,12 @@ const QuizPage = () => {
               Next <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           ) : (
-            <Button className="gradient-hero text-primary-foreground" onClick={() => submitQuiz(false)}>
-              Submit Quiz
+            <Button
+              className="gradient-hero text-primary-foreground"
+              onClick={() => submitQuiz(false)}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Submit Quiz"}
             </Button>
           )}
         </div>

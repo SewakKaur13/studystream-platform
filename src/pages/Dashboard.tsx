@@ -1,49 +1,131 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { quizStore } from "@/stores/quizStore";
-import { Quiz, QuizAttempt, Student } from "@/types/quiz";
-import Navbar from "@/components/Navbar";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen, Clock, Trophy, BarChart3, Lock } from "lucide-react";
 import { motion } from "framer-motion";
+import api from "@/api/axios";
+import { toast } from "sonner";
+import Navbar from "@/components/Navbar";
+import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const student = user as Student;
-  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
+  const student = user;
 
+  const [studentDashboard, setStudentDashboard] = useState({
+    quizzes: [] as any[],
+    attempts: [] as any[],
+    avgScore: "0",
+  });
+  const [recentAttempts, setRecentAttempts] = useState<any[]>([]);
+  const [startingQuizId, setStartingQuizId] = useState<string | null>(null);
+  const studentName = sessionStorage.getItem("name");
+  const navigate = useNavigate();
+
+  // Fetch dynamic data from backend Dashboard API
   useEffect(() => {
-    setQuizzes(quizStore.getQuizzes());
-    setAttempts(quizStore.getAttempts(student.id));
-  }, [student.id]);
+    const fetchStudentDashboard = async () => {
+      try {
+        const res = await api.get("/student/dashboard");
+        setStudentDashboard(res.data);
+      } catch (error: any) {
+        console.error("Failed to fetch student dashboard", error);
+        toast.error(
+          error?.response?.data?.message || "Failed to load dashboard",
+        );
+      }
+    };
 
-  const avgScore = attempts.length > 0
-    ? Math.round(attempts.reduce((s, a) => s + a.percentage, 0) / attempts.length)
-    : 0;
+    fetchStudentDashboard();
+  }, []);
+
+  const quizzes = studentDashboard?.quizzes || [];
+  const attempts = studentDashboard?.attempts || [];
 
   const stats = [
-    { icon: BookOpen, label: "Available Quizzes", value: quizzes.length, color: "text-primary" },
-    { icon: Trophy, label: "Completed", value: attempts.length, color: "text-success" },
-    { icon: BarChart3, label: "Avg Score", value: `${avgScore}%`, color: "text-accent" },
+    {
+      icon: BookOpen,
+      label: "Available Quizzes",
+      value: quizzes?.length,
+      color: "text-primary",
+    },
+    {
+      icon: Trophy,
+      label: "Completed",
+      value: attempts?.length,
+      color: "text-success",
+    },
+    {
+      icon: BarChart3,
+      label: "Avg Score",
+      value: `${studentDashboard?.avgScore}%`,
+      color: "text-accent",
+    },
   ];
+
+  // Fetch recent attempts for the table
+  useEffect(() => {
+    const fetchRecentAttempts = async () => {
+      try {
+        const res = await api.get("/student/recent-attempts");
+        setRecentAttempts(res.data);
+      } catch (error) {
+        console.error("Failed to fetch recent attempts", error);
+      }
+    };
+
+    fetchRecentAttempts();
+  }, []);
+
+  // Helper function to get lock message based on lockedUntil time
+  const getLockMessage = (lockedUntil: string) => {
+    const now = new Date();
+    const lockDate = new Date(lockedUntil);
+
+    const diffMs = lockDate.getTime() - now.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    // If approx 24 hours
+    if (diffHours > 23 && diffHours <= 24) {
+      return "Available after 1 day";
+    }
+
+    // If less than 24 hours → show hours
+    if (diffHours < 24) {
+      return `Available in ${Math.ceil(diffHours)} hours`;
+    }
+
+    // Fallback → full date
+    return `Locked until ${lockDate.toLocaleString()}`;
+  };
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold">Welcome, {student.name}!</h1>
+          <h1 className="text-3xl font-bold">Welcome, {studentName}!</h1>
           <p className="text-muted-foreground">Ready to test your knowledge?</p>
         </div>
 
         {/* Stats */}
         <div className="mb-8 grid gap-4 sm:grid-cols-3">
           {stats.map((s, i) => (
-            <motion.div key={s.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
+            <motion.div
+              key={s.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+            >
               <Card>
                 <CardContent className="flex items-center gap-4 p-6">
                   <div className={`rounded-lg bg-muted p-3 ${s.color}`}>
@@ -62,11 +144,20 @@ const Dashboard = () => {
         {/* Quizzes */}
         <h2 className="mb-4 text-xl font-semibold">Available Quizzes</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {quizzes.map((quiz) => {
-            const locked = quizStore.isLocked(quiz.id, student.id);
-            const attempted = attempts.filter((a) => a.quizId === quiz.id);
+          {quizzes?.map((quiz) => {
+            const attempted = attempts.filter((a) => a.quizId === quiz._id);
+            const locked = quiz.locked || false;
+
             return (
-              <Card key={quiz.id} className={`transition-shadow hover:shadow-elevated ${locked ? "opacity-60" : ""}`}>
+              <Card
+                key={quiz._id}
+                className={`transition-all duration-200 
+                  ${
+                    locked
+                      ? "bg-muted/40 border-muted text-muted-foreground cursor-not-allowed"
+                      : "hover:shadow-elevated"
+                  }`}
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <CardTitle className="text-lg">{quiz.title}</CardTitle>
@@ -76,9 +167,16 @@ const Dashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="mb-4 flex flex-wrap gap-2 text-xs">
-                    <Badge variant="secondary"><Clock className="mr-1 h-3 w-3" />{quiz.timeLimit} min</Badge>
-                    <Badge variant="secondary">{quiz.questions.length} questions</Badge>
-                    <Badge variant="secondary">{quiz.marksPerQuestion} marks each</Badge>
+                    <Badge variant="secondary">
+                      <Clock className="mr-1 h-3 w-3" />
+                      {quiz.duration} min
+                    </Badge>
+                    <Badge variant="secondary">
+                      {quiz.questions.length} questions
+                    </Badge>
+                    <Badge variant="secondary">
+                      {quiz.marksPerQuestion} marks each
+                    </Badge>
                   </div>
                   {attempted.length > 0 && (
                     <p className="mb-3 text-xs text-muted-foreground">
@@ -86,11 +184,36 @@ const Dashboard = () => {
                     </p>
                   )}
                   {locked ? (
-                    <p className="text-xs text-destructive">Locked due to tab switching. Try again later.</p>
+                    <div className="space-y-2">
+                      <p className="text-xs text-destructive font-medium flex items-center gap-1">
+                        <Lock className="h-3 w-3" />
+                        Quiz locked
+                      </p>
+
+                      {quiz.lockedUntil && (
+                        <p className="text-[11px] text-muted-foreground">
+                          {getLockMessage(quiz.lockedUntil)}
+                        </p>
+                      )}
+
+                      <Button size="sm" disabled className="w-full">
+                        Locked
+                      </Button>
+                    </div>
                   ) : (
-                    <Link to={`/quiz/${quiz.id}`}>
-                      <Button size="sm" className="w-full gradient-hero text-primary-foreground">Start Quiz</Button>
-                    </Link>
+                    <Button
+                      size="sm"
+                      disabled={startingQuizId === quiz._id}
+                      className="w-full gradient-hero text-primary-foreground"
+                      onClick={() => {
+                        setStartingQuizId(quiz._id);
+                        navigate(`/quiz/${quiz._id}`);
+                      }}
+                    >
+                      {startingQuizId === quiz._id
+                        ? "Starting..."
+                        : "Start Quiz"}
+                    </Button>
                   )}
                 </CardContent>
               </Card>
@@ -99,9 +222,10 @@ const Dashboard = () => {
         </div>
 
         {/* Recent Attempts */}
-        {attempts.length > 0 && (
+        {recentAttempts?.length > 0 && (
           <div className="mt-10">
             <h2 className="mb-4 text-xl font-semibold">Recent Attempts</h2>
+
             <div className="overflow-x-auto rounded-lg border border-border">
               <table className="w-full text-sm">
                 <thead className="bg-muted">
@@ -112,19 +236,37 @@ const Dashboard = () => {
                     <th className="p-3 text-left font-medium">Date</th>
                   </tr>
                 </thead>
+
                 <tbody>
-                  {[...attempts].reverse().slice(0, 5).map((a) => (
-                    <tr key={a.id} className="border-t border-border">
-                      <td className="p-3">{a.quizTitle}</td>
-                      <td className="p-3">{a.score}/{a.totalMarks}</td>
-                      <td className="p-3">
-                        <Badge variant={a.percentage >= 70 ? "default" : a.percentage >= 40 ? "secondary" : "destructive"}>
-                          {a.percentage}%
-                        </Badge>
-                      </td>
-                      <td className="p-3 text-muted-foreground">{new Date(a.completedAt).toLocaleDateString()}</td>
-                    </tr>
-                  ))}
+                  {recentAttempts.slice(0, 5).map((a, i) => {
+                    const percentageNumber = parseFloat(a?.percentage);
+
+                    return (
+                      <tr key={i} className="border-t border-border">
+                        <td className="p-3">{a?.quizTitle}</td>
+
+                        <td className="p-3">{a?.score}</td>
+
+                        <td className="p-3">
+                          <Badge
+                            variant={
+                              percentageNumber >= 70
+                                ? "default"
+                                : percentageNumber >= 40
+                                  ? "secondary"
+                                  : "destructive"
+                            }
+                          >
+                            {a?.percentage}
+                          </Badge>
+                        </td>
+
+                        <td className="p-3 text-muted-foreground">
+                          {new Date(a.date).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -4,9 +4,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Shield, AlertCircle } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
+import api from "@/api/axios";
 
 const AdminLogin = () => {
   const [username, setUsername] = useState("");
@@ -14,18 +22,26 @@ const AdminLogin = () => {
   const [error, setError] = useState("");
   const { loginAdmin } = useAuth();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!username.trim() || !password.trim()) {
       setError("Please fill in all fields");
       return;
     }
-    if (loginAdmin(username.trim(), password)) {
+    try {
+      setLoading(true);
+      await loginAdmin(username.trim(), password);
+
+      toast.success("Admin login successful");
+
       navigate("/admin");
-    } else {
-      setError("Invalid admin credentials");
+    } catch (error: any) {
+      toast.error(error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -33,7 +49,10 @@ const AdminLogin = () => {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold text-primary font-heading">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 text-2xl font-bold text-primary font-heading"
+          >
             <Shield className="h-8 w-8" /> QuizMaster Admin
           </Link>
         </div>
@@ -68,13 +87,14 @@ const AdminLogin = () => {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
-              <Button type="submit" className="w-full gradient-accent text-accent-foreground">
-                Login as Admin
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full gradient-accent text-accent-foreground"
+              >
+                {loading ? "Logging in..." : "Login as Admin"}
               </Button>
             </form>
-            <p className="mt-4 text-center text-xs text-muted-foreground">
-              Demo: admin / admin123
-            </p>
           </CardContent>
         </Card>
       </div>

@@ -40,9 +40,6 @@ const Landing = () => {
             <Link to="/login">
               <Button variant="outline" size="sm">Student Login</Button>
             </Link>
-            <Link to="/admin/login">
-              <Button variant="ghost" size="sm" className="text-muted-foreground">Admin</Button>
-            </Link>
           </div>
         </div>
       </header>
@@ -176,7 +173,7 @@ const Landing = () => {
       {/* Footer */}
       <footer className="border-t border-border py-8">
         <div className="container text-center text-sm text-muted-foreground">
-          © 2024 QuizMaster. Built for better learning.
+          © 2026 QuizMaster. Built for better learning.
         </div>
       </footer>
     </div>

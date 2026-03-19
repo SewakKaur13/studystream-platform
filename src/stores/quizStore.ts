@@ -27,7 +27,7 @@ export const quizStore = {
   getQuizzes: (): Quiz[] => getItem(QUIZZES_KEY, mockQuizzes),
 
   getQuiz: (id: string): Quiz | undefined =>
-    quizStore.getQuizzes().find((q) => q.id === id),
+    quizStore.getQuizzes().find((q) => q._id === id),
 
   addQuiz: (quiz: Quiz) => {
     const quizzes = quizStore.getQuizzes();
@@ -36,12 +36,12 @@ export const quizStore = {
   },
 
   updateQuiz: (quiz: Quiz) => {
-    const quizzes = quizStore.getQuizzes().map((q) => (q.id === quiz.id ? quiz : q));
+    const quizzes = quizStore.getQuizzes().map((q) => (q._id === quiz._id ? quiz : q));
     setItem(QUIZZES_KEY, quizzes);
   },
 
   deleteQuiz: (id: string) => {
-    const quizzes = quizStore.getQuizzes().filter((q) => q.id !== id);
+    const quizzes = quizStore.getQuizzes().filter((q) => q._id !== id);
     setItem(QUIZZES_KEY, quizzes);
   },
 
@@ -82,11 +82,5 @@ export const quizStore = {
     const lock = locks.find((l) => l.quizId === quizId && l.studentId === studentId);
     if (!lock) return null;
     return new Date(lock.lockedUntil) > new Date() ? lock.lockedUntil : null;
-  },
-
-  // Shuffle questions for a student
-  shuffleQuestions: (quiz: Quiz): Quiz => {
-    const shuffled = [...quiz.questions].sort(() => Math.random() - 0.5);
-    return { ...quiz, questions: shuffled };
   },
 };

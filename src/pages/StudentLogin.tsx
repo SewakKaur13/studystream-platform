@@ -4,28 +4,54 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { BookOpen, AlertCircle } from "lucide-react";
 import { Link } from "react-router-dom";
+import api from "@/api/axios";
+import { toast } from "sonner";
 
+export const loginStudentApi = async (
+  enrollmentNumber: string,
+  password: string,
+) => {
+  const res = await api.post("/auth/login", {
+    enrollmentNumber,
+    password,
+  });
+
+  return res.data;
+};
 const StudentLogin = () => {
   const [enrollment, setEnrollment] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const { loginStudent } = useAuth();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
     if (!enrollment.trim() || !password.trim()) {
       setError("Please fill in all fields");
       return;
     }
-    if (loginStudent(enrollment.trim(), password)) {
+    try {
+      setLoading(true);
+      await loginStudent(enrollment.trim(), password);
+      toast.success("Login successful");
       navigate("/dashboard");
-    } else {
-      setError("Invalid enrollment number or password");
+    } catch (error: any) {
+      toast.error(error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -33,14 +59,19 @@ const StudentLogin = () => {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold text-primary font-heading">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 text-2xl font-bold text-primary font-heading"
+          >
             <BookOpen className="h-8 w-8" /> QuizMaster
           </Link>
         </div>
         <Card className="shadow-elevated">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Student Login</CardTitle>
-            <CardDescription>Enter your enrollment number to continue</CardDescription>
+            <CardDescription>
+              Enter your enrollment number to continue
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -68,13 +99,14 @@ const StudentLogin = () => {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
-              <Button type="submit" className="w-full gradient-hero text-primary-foreground">
-                Login
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full gradient-accent text-accent-foreground"
+              >
+                {loading ? "Logging in..." : "Login"}
               </Button>
             </form>
-            <p className="mt-4 text-center text-xs text-muted-foreground">
-              Demo: EN2024001 / pass123
-            </p>
           </CardContent>
         </Card>
       </div>

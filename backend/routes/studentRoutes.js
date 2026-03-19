@@ -1,0 +1,25 @@
+const express = require("express");
+const router = express.Router();
+
+const verifyUser = require("../middleware/authMiddleware");
+const {
+  getStudentDashboard,
+  startQuiz,
+  saveAnswer,
+  updateTabSwitch,
+  submitQuiz,
+  getRecentAttempts,
+  getStudentProgress,
+  lockQuiz,
+} = require("../controllers/studentController");
+
+router.get("/dashboard", verifyUser, getStudentDashboard);
+router.get("/start-quiz/:quizId", verifyUser, startQuiz);
+router.post("/save-answer", verifyUser, saveAnswer);
+router.post("/tab-switch", verifyUser, updateTabSwitch);
+router.post("/submit-quiz", verifyUser, submitQuiz);
+router.get("/recent-attempts", verifyUser, getRecentAttempts);
+router.get("/progress", verifyUser, getStudentProgress);
+router.post("/lock-quiz", verifyUser, lockQuiz);
+
+module.exports = router;

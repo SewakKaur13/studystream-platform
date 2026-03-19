@@ -1,37 +1,78 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { quizStore } from "@/stores/quizStore";
-import { QuizAttempt } from "@/types/quiz";
+import { useParams, Link, useLocation } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, Trophy, ArrowLeft, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
+import api from "@/api/axios";
+
+interface ResultDetail {
+  questionText: string;
+  options: string[];
+  selectedOption: number;
+  correctAnswer: number;
+  isCorrect: boolean;
+}
+
+interface QuizResult {
+  obtainedMarks: number;
+  totalMarks: number;
+  correct: number;
+  wrong: number;
+  autoSubmitted?: boolean;
+  resultDetails: ResultDetail[];
+  quizTitle?: string;
+}
 
 const ResultPage = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
-  const [attempt, setAttempt] = useState<QuizAttempt | null>(null);
+  const location = useLocation();
+  const [result, setResult] = useState<QuizResult | null>(location.state?.result || null);
 
   useEffect(() => {
-    const all = quizStore.getAttempts();
-    const found = all.find((a) => a.id === attemptId);
-    setAttempt(found || null);
-  }, [attemptId]);
+    if (result) return;
 
-  if (!attempt) return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
+    const fetchResult = async () => {
+      try {
+        const res = await api.get(`/student/result/${attemptId}`);
+        setResult(res.data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchResult();
+  }, [attemptId, result]);
 
-  const grade = attempt.percentage >= 90 ? "A+" : attempt.percentage >= 80 ? "A" : attempt.percentage >= 70 ? "B" : attempt.percentage >= 60 ? "C" : attempt.percentage >= 40 ? "D" : "F";
-  const gradeColor = attempt.percentage >= 70 ? "text-success" : attempt.percentage >= 40 ? "text-warning" : "text-destructive";
+  if (!result) return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
+
+  const percentage = Math.round((result.obtainedMarks / result.totalMarks) * 100);
+  const grade =
+    percentage >= 90
+      ? "A+"
+      : percentage >= 80
+      ? "A"
+      : percentage >= 70
+      ? "B"
+      : percentage >= 60
+      ? "C"
+      : percentage >= 40
+      ? "D"
+      : "F";
+  const gradeColor = percentage >= 70 ? "text-success" : percentage >= 40 ? "text-warning" : "text-destructive";
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <div className="container max-w-2xl py-12">
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }}>
+      <div className="container max-w-3xl py-12 space-y-8">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+        >
           <Card className="shadow-elevated">
             <CardHeader className="text-center">
-              {attempt.autoSubmitted && (
+              {result.autoSubmitted && (
                 <div className="mb-4 inline-flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive mx-auto">
                   <AlertTriangle className="h-4 w-4" /> Auto-submitted due to tab switching
                 </div>
@@ -39,16 +80,18 @@ const ResultPage = () => {
               <div className="mb-4">
                 <Trophy className={`mx-auto h-16 w-16 ${gradeColor}`} />
               </div>
-              <CardTitle className="text-3xl">{attempt.quizTitle}</CardTitle>
+              <CardTitle className="text-3xl">{result.quizTitle || "Quiz Result"}</CardTitle>
               <p className="text-muted-foreground">Quiz Results</p>
             </CardHeader>
             <CardContent>
               {/* Score circle */}
               <div className="mb-8 flex justify-center">
-                <div className={`flex h-32 w-32 flex-col items-center justify-center rounded-full border-4 ${
-                  attempt.percentage >= 70 ? "border-success" : attempt.percentage >= 40 ? "border-warning" : "border-destructive"
-                }`}>
-                  <span className={`text-4xl font-bold ${gradeColor}`}>{attempt.percentage}%</span>
+                <div
+                  className={`flex h-32 w-32 flex-col items-center justify-center rounded-full border-4 ${
+                    percentage >= 70 ? "border-success" : percentage >= 40 ? "border-warning" : "border-destructive"
+                  }`}
+                >
+                  <span className={`text-4xl font-bold ${gradeColor}`}>{percentage}%</span>
                   <span className="text-sm text-muted-foreground">Grade: {grade}</span>
                 </div>
               </div>
@@ -56,30 +99,73 @@ const ResultPage = () => {
               {/* Stats grid */}
               <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <div className="rounded-lg bg-muted p-4 text-center">
-                  <p className="text-2xl font-bold">{attempt.score}</p>
+                  <p className="text-2xl font-bold">{result.obtainedMarks}</p>
                   <p className="text-xs text-muted-foreground">Score</p>
                 </div>
                 <div className="rounded-lg bg-muted p-4 text-center">
-                  <p className="text-2xl font-bold">{attempt.totalMarks}</p>
+                  <p className="text-2xl font-bold">{result.totalMarks}</p>
                   <p className="text-xs text-muted-foreground">Total Marks</p>
                 </div>
                 <div className="rounded-lg bg-success/10 p-4 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <CheckCircle2 className="h-5 w-5 text-success" />
-                    <p className="text-2xl font-bold text-success">{attempt.correctCount}</p>
+                    <p className="text-2xl font-bold text-success">{result.correct}</p>
                   </div>
                   <p className="text-xs text-muted-foreground">Correct</p>
                 </div>
                 <div className="rounded-lg bg-destructive/10 p-4 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <XCircle className="h-5 w-5 text-destructive" />
-                    <p className="text-2xl font-bold text-destructive">{attempt.wrongCount}</p>
+                    <p className="text-2xl font-bold text-destructive">{result.wrong}</p>
                   </div>
                   <p className="text-xs text-muted-foreground">Wrong</p>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row">
+              {/* Questions Review */}
+              <div className="space-y-6">
+                {result.resultDetails.map((q, idx) => (
+                  <Card key={idx} className="shadow-card">
+                    <CardHeader>
+                      <p className="text-sm text-muted-foreground">
+                        Question {idx + 1}
+                      </p>
+                      <CardTitle className="text-lg">{q.questionText}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {q.options.map((opt, i) => {
+                        const isSelected = i === q.selectedOption;
+                        const isCorrect = i === q.correctAnswer;
+                        const correctStyle = isCorrect ? "border-success bg-success/10" : "";
+                        const wrongStyle = isSelected && !q.isCorrect ? "border-destructive bg-destructive/10" : "";
+                        const selectedMarker = isSelected ? (q.isCorrect ? "✓" : "✕") : "";
+
+                        return (
+                          <div
+                            key={i}
+                            className={`w-full rounded-lg border p-3 text-left flex items-center justify-between ${
+                              correctStyle || wrongStyle || "border-border"
+                            }`}
+                          >
+                            <span>
+                              <span className="mr-2 font-bold">{String.fromCharCode(65 + i)}.</span>
+                              {opt}
+                            </span>
+                            {isSelected && (
+                              <span className={`font-bold ${q.isCorrect ? "text-success" : "text-destructive"}`}>
+                                {selectedMarker}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Navigation */}
+              <div className="flex flex-col gap-3 sm:flex-row mt-6">
                 <Link to="/dashboard" className="flex-1">
                   <Button variant="outline" className="w-full">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard

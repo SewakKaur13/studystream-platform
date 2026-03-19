@@ -6,13 +6,28 @@ export interface Question {
 }
 
 export interface Quiz {
-  id: string;
+  _id: string;
   title: string;
   description: string;
-  timeLimit: number; // minutes
-  marksPerQuestion: number;
-  questions: Question[];
+  duration?: number;
+  totalQuestions: number;
+  attempts: number;
+  status: "active" | "locked";
   createdAt: string;
+}
+
+export interface QuizDetail {
+  _id?: string;
+  title: string;
+  description: string;
+  duration: number;
+  marksPerQuestion: number;
+  questions: {
+    id: string;
+    text: string;
+    options: string[];
+    correctAnswer: number;
+  }[];
 }
 
 export interface QuizAttempt {
@@ -31,16 +46,15 @@ export interface QuizAttempt {
 }
 
 export interface Student {
-  id: string;
+  _id: string;
   name: string;
   enrollmentNumber: string;
-  password: string;
 }
 
 export interface Admin {
   id: string;
-  username: string;
-  password: string;
+  name: string;
+  enrollmentNumber: string;
 }
 
 export interface QuizLock {
