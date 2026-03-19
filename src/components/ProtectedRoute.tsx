@@ -10,6 +10,10 @@ export const StudentRoute = ({ children }: { children: ReactNode }) => {
 
 export const AdminRoute = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated, userType } = useAuth();
-  if (!isAuthenticated || userType !== "admin") return <Navigate to="/admin/login" replace />;
+
+  if (!isAuthenticated || userType !== "admin") {
+    return <Navigate to="/admin/login" replace />;
+  }
+
   return <>{children}</>;
 };
