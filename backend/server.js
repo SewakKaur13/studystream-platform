@@ -16,7 +16,10 @@ connectDB();
 const app = express();
 
 /* CORS Configuration */
-app.use(cors());
+app.use(cors({
+  origin: "https://studystream-platform.vercel.app/",
+  credentials: true
+}));
 
 /* Middlewares */
 app.use(express.json());
