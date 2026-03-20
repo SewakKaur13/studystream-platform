@@ -371,7 +371,17 @@ const QuizPage = () => {
             <p className="text-sm text-muted-foreground">
               Question {currentQ + 1} of {quiz.questions.length}
             </p>
-            <CardTitle className="text-xl">{q.text}</CardTitle>
+            <CardTitle className="text-xl">
+              {q.text.includes("|")
+                ? q.text.split(";").map((row, i) => (
+                    <div key={i} className="grid grid-cols-6 gap-2 text-sm">
+                      {row.split("|").map((col, j) => (
+                        <span key={j}>{col}</span>
+                      ))}
+                    </div>
+                  ))
+                : q.text}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {q.options?.map((opt, i) => (

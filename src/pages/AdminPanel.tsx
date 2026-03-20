@@ -84,12 +84,7 @@ const AdminPanel = () => {
     doc.text(`${analyticsQuizTitle} - Results`, 14, 15);
 
     // Table columns
-    const tableColumn = [
-      "Enrollment",
-      "Name",
-      "Score",
-      "Percentage"
-    ];
+    const tableColumn = ["Enrollment", "Name", "Score", "Percentage"];
 
     // Table rows
     const tableRows = analyticsData.map((item) => [
@@ -687,7 +682,7 @@ const QuizForm = ({
             <Input
               value={q.text}
               onChange={(e) => updateQuestion(qi, "text", e.target.value)}
-              placeholder="Question text"
+              placeholder="Question text (use | for columns and ; for rows if table needed)"
             />
             {q.options.map((opt, oi) => (
               <div key={oi} className="flex items-center gap-2">
