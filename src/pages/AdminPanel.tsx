@@ -544,6 +544,7 @@ const QuizForm = ({
   const [title, setTitle] = useState(quiz?.title || "");
   const [description, setDescription] = useState(quiz?.description || "");
   const [timeLimit, setTimeLimit] = useState(quiz?.duration || 15);
+  const [loading, setLoading] = useState(false);
   const [marksPerQuestion, setMarksPerQuestion] = useState(
     quiz?.marksPerQuestion || 2,
   );
@@ -587,28 +588,38 @@ const QuizForm = ({
     setQuestions(questions.filter((_, i) => i !== idx));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!title.trim()) {
       toast.error("Title required");
       return;
     }
+
     if (
       questions.some((q) => !q.text.trim() || q.options.some((o) => !o.trim()))
     ) {
       toast.error("All questions and options must be filled");
       return;
     }
-    onSave({
-      _id: quiz?._id,
-      title: title.trim(),
-      description: description.trim(),
-      duration: timeLimit,
-      marksPerQuestion,
-      questions,
-    });
-  };
 
+    try {
+      setLoading(true);
+
+      await onSave({
+        _id: quiz?._id,
+        title: title.trim(),
+        description: description.trim(),
+        duration: timeLimit,
+        marksPerQuestion,
+        questions,
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
@@ -710,9 +721,16 @@ const QuizForm = ({
 
       <Button
         type="submit"
+        disabled={loading}
         className="w-full gradient-accent text-accent-foreground"
       >
-        {quiz ? "Update Quiz" : "Create Quiz"}
+        {loading
+          ? quiz
+            ? "Updating..."
+            : "Creating..."
+          : quiz
+            ? "Update Quiz"
+            : "Create Quiz"}
       </Button>
     </form>
   );
