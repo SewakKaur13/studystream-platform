@@ -372,20 +372,26 @@ const QuizPage = () => {
               Question {currentQ + 1} of {quiz.questions.length}
             </p>
             <CardTitle className="text-xl">
-              {q.text.split(";")?.map((row, i) => (
-                <div
-                  key={i}
-                  className={
-                    i === 0
-                      ? "mb-3 font-medium"
-                      : "grid grid-cols-7 gap-2 text-sm overflow-x-auto"
-                  }
-                >
-                  {row.includes("|")
-                    ? row.split("|")?.map((col, j) => <span key={j}>{col}</span>)
-                    : row}
-                </div>
-              ))}
+              {q.text.split(";").map((row, i) => {
+                const isTable = row.includes("|");
+
+                return (
+                  <div
+                    key={i}
+                    className={
+                      isTable
+                        ? "grid grid-cols-7 gap-2 text-sm overflow-x-auto"
+                        : "mb-3 font-medium"
+                    }
+                  >
+                    {isTable
+                      ? row
+                          .split("|")
+                          .map((col, j) => <span key={j}>{col}</span>)
+                      : row}
+                  </div>
+                );
+              })}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
