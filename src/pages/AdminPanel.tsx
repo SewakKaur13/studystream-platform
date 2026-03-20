@@ -87,7 +87,7 @@ const AdminPanel = () => {
     const tableColumn = ["Enrollment", "Name", "Score", "Percentage"];
 
     // Table rows
-    const tableRows = analyticsData.map((item) => [
+    const tableRows = analyticsData?.map((item) => [
       item.enrollmentNumber,
       item.studentName,
       item.score,
@@ -169,7 +169,7 @@ const AdminPanel = () => {
         description: data.description,
         duration: data.duration,
         marksPerQuestion: data.marksPerQuestion,
-        questions: data.questions.map((q: any, idx: number) => ({
+        questions: data.questions?.map((q: any, idx: number) => ({
           id: q._id || `q_${idx}`, // generate id if not present
           text: q.questionText, // map questionText → text
           options: q.options,
@@ -250,7 +250,7 @@ const AdminPanel = () => {
                   try {
                     const payload = {
                       ...q,
-                      questions: q.questions.map((ques) => ({
+                      questions: q.questions?.map((ques) => ({
                         questionText: ques.text,
                         options: ques.options,
                         correctAnswer: ques.correctAnswer,
@@ -286,7 +286,7 @@ const AdminPanel = () => {
 
         {/* Stats */}
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((s) => (
+          {stats?.map((s) => (
             <Card key={s.label}>
               <CardContent className="flex items-center gap-4 p-6">
                 <div className="rounded-lg bg-accent/10 p-3">
@@ -501,7 +501,7 @@ const AdminPanel = () => {
                     </thead>
 
                     <tbody className="divide-y divide-gray-200">
-                      {analyticsData.map((item, index) => (
+                      {analyticsData?.map((item, index) => (
                         <tr key={index}>
                           <td className="px-4 py-2 text-sm">
                             {item.enrollmentNumber}
@@ -673,7 +673,7 @@ const QuizForm = ({
             <Plus className="mr-1 h-3 w-3" /> Add
           </Button>
         </div>
-        {questions.map((q, qi) => (
+        {questions?.map((q, qi) => (
           <div
             key={q.id}
             className="rounded-lg border border-border p-4 space-y-3"
@@ -695,7 +695,7 @@ const QuizForm = ({
               onChange={(e) => updateQuestion(qi, "text", e.target.value)}
               placeholder="Question text (use | for columns and ; for rows if table needed)"
             />
-            {q.options.map((opt, oi) => (
+            {q.options?.map((opt, oi) => (
               <div key={oi} className="flex items-center gap-2">
                 <input
                   type="radio"

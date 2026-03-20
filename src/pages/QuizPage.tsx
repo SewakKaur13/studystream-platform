@@ -53,7 +53,7 @@ const QuizPage = () => {
           title: data.title,
           marksPerQuestion: data.marksPerQuestion,
           description: data.description || "",
-          questions: (data.questions || []).map((q: any) => ({
+          questions: (data.questions || [])?.map((q: any) => ({
             id: q._id,
             text: q.questionText,
             options: q.options,
@@ -323,7 +323,7 @@ const QuizPage = () => {
       <div className="container max-w-3xl py-8">
         <div className="mb-6">
           <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2">
-            {quiz.questions.map((question, index) => {
+            {quiz.questions?.map((question, index) => {
               const isAnswered = answers[question.id] !== undefined;
               const isVisited = visited[question.id];
 
@@ -372,15 +372,20 @@ const QuizPage = () => {
               Question {currentQ + 1} of {quiz.questions.length}
             </p>
             <CardTitle className="text-xl">
-              {q.text.includes("|")
-                ? q.text.split(";").map((row, i) => (
-                    <div key={i} className="grid grid-cols-6 gap-2 text-sm">
-                      {row.split("|").map((col, j) => (
-                        <span key={j}>{col}</span>
-                      ))}
-                    </div>
-                  ))
-                : q.text}
+              {q.text.split(";")?.map((row, i) => (
+                <div
+                  key={i}
+                  className={
+                    i === 0
+                      ? "mb-3 font-medium"
+                      : "grid grid-cols-7 gap-2 text-sm overflow-x-auto"
+                  }
+                >
+                  {row.includes("|")
+                    ? row.split("|")?.map((col, j) => <span key={j}>{col}</span>)
+                    : row}
+                </div>
+              ))}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
