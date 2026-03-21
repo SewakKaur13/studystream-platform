@@ -67,10 +67,12 @@ const getQuizAnalytics = async (req, res) => {
   try {
     const { quizId } = req.params;
 
+    // Validate quizId
     if (!mongoose.Types.ObjectId.isValid(quizId)) {
       return res.status(400).json({ message: "Invalid quiz ID" });
     }
 
+    // Get quiz
     const quiz = await Quiz.findById(quizId).select("questions");
 
     if (!quiz) {
@@ -79,39 +81,45 @@ const getQuizAnalytics = async (req, res) => {
 
     const totalQuestions = quiz.questions?.length || 1;
 
+    // Get attempts
     const attempts = await Attempt.find({ quizId })
       .populate("studentId", "name enrollmentNumber");
 
+    // Prepare analytics
     const analytics = attempts.map((a) => {
       let correct = a?.correctCount || 0;
       let wrong = a?.wrongCount || 0;
 
       const tabSwitchCount = a?.tabSwitchCount || 0;
 
-      //If auto-submitted due to tab switching
+      // Fix wrong count if auto-submitted due to tab switching
       if (tabSwitchCount >= 3) {
         const expectedWrong = totalQuestions - correct;
 
-        //If DB wrong is less than expected → fix it
         if (wrong < expectedWrong) {
           wrong = expectedWrong;
         }
       }
 
+      // Calculate percentage
       const percentage = ((correct / totalQuestions) * 100).toFixed(2);
+
+      // Determine submit mode
+      const submitMode = tabSwitchCount >= 3 ? "cheating" : "submitted";
 
       return {
         studentName: a.studentId?.name || "N/A",
         enrollmentNumber: a.studentId?.enrollmentNumber || "N/A",
         score: a?.score || correct,
         correct,
-        wrong, //If DB wrong is less than expected → fix it
+        wrong,
         percentage,
         date: a?.submittedAt,
+        submitMode,
       };
     });
 
-    //Sorting: highest marks first, then earliest submission
+    // Sorting: highest correct first, then earliest submission
     analytics.sort((a, b) => {
       if (b.correct !== a.correct) {
         return b.correct - a.correct;
@@ -123,6 +131,7 @@ const getQuizAnalytics = async (req, res) => {
       totalAttempts: attempts.length,
       analytics,
     });
+
   } catch (error) {
     console.error("Analytics Error:", error);
     res.status(500).json({ message: "Server error" });
