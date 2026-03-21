@@ -73,38 +73,51 @@ const AdminPanel = () => {
       console.error("Failed to fetch analytics", error);
     }
   };
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
+ const handleExportPDF = () => {
+  const doc = new jsPDF();
 
-    // File name: QuizName_Result.pdf
-    const fileName = `${analyticsQuizTitle}_Result.pdf`;
+  const fileName = `${analyticsQuizTitle}_Result.pdf`;
 
-    // Title
-    doc.setFontSize(14);
-    doc.text(`${analyticsQuizTitle} - Results`, 14, 15);
+  // Title
+  doc.setFontSize(14);
+  doc.text(`${analyticsQuizTitle} - Results`, 14, 15);
 
-    // Table columns
-    const tableColumn = ["Enrollment", "Name", "Score", "Percentage"];
+  // Columns
+  const tableColumn = [
+    "Enrollment",
+    "Name",
+    "Score",
+    "Percentage",
+    "Mode",
+  ];
 
-    // Table rows
-    const tableRows = analyticsData?.map((item) => [
-      item.enrollmentNumber,
-      item.studentName,
-      item.score,
-      `${item.percentage}%`,
-      item.correct,
-      item.wrong,
-      new Date(item.date).toLocaleString(),
-    ]);
+  // Rows
+  const tableRows = analyticsData?.map((item) => [
+    item.enrollmentNumber,
+    item.studentName,
+    item.score,
+    `${item.percentage}%`,
+    item.submitMode === "cheating" ? "Cheating" : "Submitted",
+  ]);
 
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 20,
-    });
+  autoTable(doc, {
+    head: [tableColumn],
+    body: tableRows,
+    startY: 20,
 
-    doc.save(fileName);
-  };
+    // background color for cheating rows
+    didParseCell: function (data) {
+      const rowIndex = data.row.index;
+      const item = analyticsData[rowIndex];
+
+      if (item?.submitMode === "cheating") {
+        data.cell.styles.fillColor = [255, 230, 230];
+      }
+    },
+  });
+
+  doc.save(fileName);
+};
 
   //api call of dashboard stats
   const fetchDashboard = async () => {
@@ -450,13 +463,6 @@ const AdminPanel = () => {
             <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
               {/* Modal Box */}
               <div className="bg-white rounded-lg shadow-lg w-full max-w-5xl h-[85vh] flex flex-col relative">
-                {/* X Button */}
-                <button
-                  onClick={() => setAnalyticsModalOpen(false)}
-                  className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 font-bold text-xl"
-                >
-                  ×
-                </button>
 
                 {/* Header */}
                 <div className="flex justify-between items-center p-4 border-b">
@@ -464,12 +470,21 @@ const AdminPanel = () => {
                     {analyticsQuizTitle} - Analytics
                   </h2>
 
-                  <button
-                    onClick={handleExportPDF}
-                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Export PDF
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleExportPDF}
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Export PDF
+                    </button>
+
+                    <button
+                      onClick={() => setAnalyticsModalOpen(false)}
+                      className="text-gray-500 hover:text-gray-800 font-bold text-xl"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
 
                 {/* Table Container */}
