@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  ReactNode,
+} from "react";
 import api from "@/api/axios";
 import { Student, Admin } from "@/types/quiz";
 
@@ -19,7 +25,6 @@ interface AuthContextType extends AuthState {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-
   const [auth, setAuth] = useState<AuthState>(() => {
     const saved = localStorage.getItem("quizAuth");
 
@@ -39,73 +44,73 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAuth(state);
   };
 
-  const loginStudent = useCallback(async (enrollment: string, password: string) => {
-  try {
+  const loginStudent = useCallback(
+    async (enrollment: string, password: string) => {
+      try {
+        const res = await api.post("/auth/login", {
+          enrollmentNumber: enrollment,
+          password,
+        });
 
-    const res = await api.post("/auth/login", {
-      enrollmentNumber: enrollment,
-      password
-    });
+        const data = res.data;
 
-    const data = res.data;
+        const student: Student = {
+          id: data.id,
+          name: data.name,
+          enrollmentNumber: data.enrollmentNumber,
+        };
 
-    const student: Student = {
-      id: data.id,
-      name: data.name,
-      enrollmentNumber: data.enrollmentNumber
-    };
+        persist({
+          user: student,
+          userType: "student",
+          isAuthenticated: true,
+        });
 
-    persist({
-      user: student,
-      userType: "student",
-      isAuthenticated: true
-    });
+        sessionStorage.setItem("name", data.name);
+        sessionStorage.setItem("enrollmentNumber", data.enrollmentNumber);
+        localStorage.setItem("token", data.token);
+        sessionStorage.setItem("token", data.token);
 
-    sessionStorage.setItem("name", data.name);
-    sessionStorage.setItem("enrollmentNumber", data.enrollmentNumber);
-    localStorage.setItem("token", data.token);
-
-    return data;
-
-  } catch (error: any) {
-    throw error.response?.data?.message || "Login failed";
-  }
-}, []);
+        return data;
+      } catch (error: any) {
+        throw error.response?.data?.message || "Login failed";
+      }
+    },
+    [],
+  );
 
   const loginAdmin = useCallback(async (username: string, password: string) => {
-  try {
+    try {
+      const res = await api.post("/auth/login", {
+        enrollmentNumber: username,
+        password,
+      });
 
-    const res = await api.post("/auth/login", {
-      enrollmentNumber: username,
-      password
-    });
+      const data = res.data;
 
-    const data = res.data;
+      const admin: Admin = {
+        id: data.id,
+        enrollmentNumber: data.enrollmentNumber,
+        name: data.name,
+      };
 
-    const admin: Admin = {
-      id: data.id,
-      enrollmentNumber: data.enrollmentNumber,
-      name: data.name
-    };
+      persist({
+        user: admin,
+        userType: "admin",
+        isAuthenticated: true,
+      });
 
-    persist({
-      user: admin,
-      userType: "admin",
-      isAuthenticated: true
-    });
+      localStorage.setItem("token", res.data.token);
+      sessionStorage.setItem("token", res.data.token);
+      sessionStorage.setItem("name", data.name);
 
-    localStorage.setItem("token", data.token);
-    sessionStorage.setItem("name", data.name);
-
-    return data;
-
-  } catch (error: any) {
-    throw error.response?.data?.message || "Admin login failed";
-  }
-}, []);
+      return data;
+    } catch (error: any) {
+      throw error.response?.data?.message || "Admin login failed";
+    }
+  }, []);
 
   const logout = useCallback(() => {
-
     localStorage.removeItem("quizAuth");
     localStorage.removeItem("token");
 
@@ -115,9 +120,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAuth({
       user: null,
       userType: null,
-      isAuthenticated: false
+      isAuthenticated: false,
     });
-
   }, []);
 
   return (
