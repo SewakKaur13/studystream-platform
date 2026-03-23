@@ -94,7 +94,7 @@ Quiz Master is built to conduct **timed, secure online quizzes** where students 
 * **Backend:** Node.js, Express.js
 * **Database:** MongoDB
 * **Charts/Graphs:** Chart.js
-* **Architecture:** MERN Stack (MongoDB, Express.js, React.js, Node.js)
+* **Architecture:** MERN Stack (MongoDB, Express.js, React.js, Node.js) with TypeScript 
 
 ---
 
