@@ -1,73 +1,114 @@
-# Welcome to your Lovable project
+# 🎯 Quiz Master – Smart TNP Assessment Platform
 
-## Project info
+**Quiz Master** is a secure and intelligent web-based assessment platform designed for Training & Placement (TNP) activities. It ensures fair evaluation by preventing cheating during online tests while providing powerful analytics for both students and administrators.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+---
 
-## How can I edit this code?
+## 🚀 Project Overview
 
-There are several ways of editing your application.
+Quiz Master is built to conduct **timed, secure online quizzes** where students can attempt tests in a controlled environment. The system includes **tab-switch detection, quiz locking mechanisms, and performance tracking dashboards**, ensuring transparency and discipline in the evaluation process.
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## 🔐 Key Highlights
 
-Changes made via Lovable will be committed automatically to this repo.
+* 🛡️ **Anti-Cheating Mechanism**
+  Detects tab switching and automatically locks the quiz for **12 hours**.
 
-**Use your preferred IDE**
+* ⏳ **Timed Assessments**
+  Each quiz is time-bound and must be completed within the given duration.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+* 🔒 **Smart Quiz Locking**
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+  * Quiz locks for the entire day after submission
+  * Admin can manually lock/unlock quizzes
 
-Follow these steps:
+* 📊 **Performance Tracking**
+  Visual analytics with **line graphs, quiz history, and score insights**
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+---
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 👨‍🎓 Student Features
 
-# Step 3: Install the necessary dependencies.
-npm i
+* Secure login using **Enrollment Number & College Password**
+* Attempt time-based quizzes
+* Automatic restriction on cheating (tab switching detection)
+* Personalized **Student Dashboard** with:
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+  * Total quizzes
+  * Attempted quizzes
+  * Average score
+  * Recent attempts
+* View complete **quiz history and progress reports**
+* Logout functionality
 
-**Edit a file directly in GitHub**
+---
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 🛠️ Admin Features
 
-**Use GitHub Codespaces**
+* Admin Dashboard with key metrics:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+  * Total quizzes
+  * Total students
+  * Total attempts
+  * Average score
 
-## What technologies are used for this project?
+* Full **CRUD operations** for quizzes:
 
-This project is built with:
+  * Create, update, delete quizzes
+  * Lock/Unlock quizzes
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+* View detailed **analytics for each quiz**
 
-## How can I deploy this project?
+* Monitor student performance
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+* Logout functionality
 
-## Can I connect a custom domain to my Lovable project?
+---
 
-Yes, you can!
+## 🌐 Landing Page
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+* 🎯 Hero section introducing the platform
+* 💡 Motivational quotes (auto-changing every 5 seconds)
+* 📌 Step-by-step guide to:
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+  * Login
+  * Attempt quiz
+* 📄 Footer with copyright
+
+---
+
+## 🧠 Core Functionalities
+
+* Tab switching detection using JavaScript
+* Timer-based quiz engine
+* Secure authentication system
+* Dynamic dashboards for students & admin
+* Data visualization (graphs & reports)
+
+---
+
+## 🛠️ Tech Stack
+
+* **Frontend:** HTML, CSS, JavaScript, React.js
+* **Backend:** Node.js, Express.js
+* **Database:** MongoDB
+* **Charts/Graphs:** Chart.js
+* **Architecture:** MERN Stack (MongoDB, Express.js, React.js, Node.js)
+
+---
+
+## 💡 Why This Project?
+
+This project was built to solve a real problem in TNP processes — **ensuring fair and secure online assessments**. It combines **practical security logic, full-stack development, and data visualization** to create a reliable testing system.
+
+---
+
+## ✨ Future Enhancements
+
+* 🤖 AI-based proctoring
+* 📱 Mobile app version
+* 📧 Email notifications for tests
+* 📈 Advanced analytics dashboard
+
+---
