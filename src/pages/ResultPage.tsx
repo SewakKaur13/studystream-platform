@@ -3,7 +3,13 @@ import { useParams, Link, useLocation } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, XCircle, Trophy, ArrowLeft, AlertTriangle } from "lucide-react";
+import {
+  CheckCircle2,
+  XCircle,
+  Trophy,
+  ArrowLeft,
+  AlertTriangle,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import api from "@/api/axios";
 
@@ -28,7 +34,9 @@ interface QuizResult {
 const ResultPage = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
   const location = useLocation();
-  const [result, setResult] = useState<QuizResult | null>(location.state?.result || null);
+  const [result, setResult] = useState<QuizResult | null>(
+    location.state?.result || null,
+  );
 
   useEffect(() => {
     if (result) return;
@@ -44,22 +52,34 @@ const ResultPage = () => {
     fetchResult();
   }, [attemptId, result]);
 
-  if (!result) return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
+  if (!result)
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        Loading...
+      </div>
+    );
 
-  const percentage = Math.round((result.obtainedMarks / result.totalMarks) * 100);
+  const percentage = Math.round(
+    (result.obtainedMarks / result.totalMarks) * 100,
+  );
   const grade =
     percentage >= 90
       ? "A+"
       : percentage >= 80
-      ? "A"
-      : percentage >= 70
-      ? "B"
-      : percentage >= 60
-      ? "C"
+        ? "A"
+        : percentage >= 70
+          ? "B"
+          : percentage >= 60
+            ? "C"
+            : percentage >= 40
+              ? "D"
+              : "F";
+  const gradeColor =
+    percentage >= 70
+      ? "text-success"
       : percentage >= 40
-      ? "D"
-      : "F";
-  const gradeColor = percentage >= 70 ? "text-success" : percentage >= 40 ? "text-warning" : "text-destructive";
+        ? "text-warning"
+        : "text-destructive";
 
   return (
     <div className="min-h-screen bg-background">
@@ -74,13 +94,16 @@ const ResultPage = () => {
             <CardHeader className="text-center">
               {result.autoSubmitted && (
                 <div className="mb-4 inline-flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive mx-auto">
-                  <AlertTriangle className="h-4 w-4" /> Auto-submitted due to tab switching
+                  <AlertTriangle className="h-4 w-4" /> Auto-submitted due to
+                  tab switching
                 </div>
               )}
               <div className="mb-4">
                 <Trophy className={`mx-auto h-16 w-16 ${gradeColor}`} />
               </div>
-              <CardTitle className="text-3xl">{result.quizTitle || "Quiz Result"}</CardTitle>
+              <CardTitle className="text-3xl">
+                {result.quizTitle || "Quiz Result"}
+              </CardTitle>
               <p className="text-muted-foreground">Quiz Results</p>
             </CardHeader>
             <CardContent>
@@ -88,11 +111,19 @@ const ResultPage = () => {
               <div className="mb-8 flex justify-center">
                 <div
                   className={`flex h-32 w-32 flex-col items-center justify-center rounded-full border-4 ${
-                    percentage >= 70 ? "border-success" : percentage >= 40 ? "border-warning" : "border-destructive"
+                    percentage >= 70
+                      ? "border-success"
+                      : percentage >= 40
+                        ? "border-warning"
+                        : "border-destructive"
                   }`}
                 >
-                  <span className={`text-4xl font-bold ${gradeColor}`}>{percentage}%</span>
-                  <span className="text-sm text-muted-foreground">Grade: {grade}</span>
+                  <span className={`text-4xl font-bold ${gradeColor}`}>
+                    {percentage}%
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    Grade: {grade}
+                  </span>
                 </div>
               </div>
 
@@ -109,14 +140,18 @@ const ResultPage = () => {
                 <div className="rounded-lg bg-success/10 p-4 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <CheckCircle2 className="h-5 w-5 text-success" />
-                    <p className="text-2xl font-bold text-success">{result.correct}</p>
+                    <p className="text-2xl font-bold text-success">
+                      {result.correct}
+                    </p>
                   </div>
                   <p className="text-xs text-muted-foreground">Correct</p>
                 </div>
                 <div className="rounded-lg bg-destructive/10 p-4 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <XCircle className="h-5 w-5 text-destructive" />
-                    <p className="text-2xl font-bold text-destructive">{result.wrong}</p>
+                    <p className="text-2xl font-bold text-destructive">
+                      {result.wrong}
+                    </p>
                   </div>
                   <p className="text-xs text-muted-foreground">Wrong</p>
                 </div>
@@ -130,15 +165,57 @@ const ResultPage = () => {
                       <p className="text-sm text-muted-foreground">
                         Question {idx + 1}
                       </p>
-                      <CardTitle className="text-lg">{q.questionText}</CardTitle>
+
+                      {/*QUESTION TEXT WITH TABLE SUPPORT */}
+                      <CardTitle className="text-lg space-y-2">
+                        {q.questionText.split(";").map((row, i) => {
+                          const isTableRow = row.includes("|");
+
+                          return isTableRow ? (
+                            <div key={i} className="overflow-x-auto">
+                              <div className="inline-block border border-border rounded-md">
+                                <div className="flex">
+                                  {row.split("|").map((col, j) => (
+                                    <div
+                                      key={j}
+                                      className={`px-3 py-2 text-sm border-r border-b border-border min-w-[100px] text-center ${
+                                        i === 1 ? "bg-muted font-semibold" : ""
+                                      }`}
+                                    >
+                                      {col}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <p key={i} className="font-medium">
+                              {row}
+                            </p>
+                          );
+                        })}
+                      </CardTitle>
                     </CardHeader>
+
                     <CardContent className="space-y-2">
                       {q.options.map((opt, i) => {
                         const isSelected = i === q.selectedOption;
                         const isCorrect = i === q.correctAnswer;
-                        const correctStyle = isCorrect ? "border-success bg-success/10" : "";
-                        const wrongStyle = isSelected && !q.isCorrect ? "border-destructive bg-destructive/10" : "";
-                        const selectedMarker = isSelected ? (q.isCorrect ? "✓" : "✕") : "";
+
+                        const correctStyle = isCorrect
+                          ? "border-success bg-success/10"
+                          : "";
+
+                        const wrongStyle =
+                          isSelected && !q.isCorrect
+                            ? "border-destructive bg-destructive/10"
+                            : "";
+
+                        const selectedMarker = isSelected
+                          ? q.isCorrect
+                            ? "✓"
+                            : "✕"
+                          : "";
 
                         return (
                           <div
@@ -148,11 +225,20 @@ const ResultPage = () => {
                             }`}
                           >
                             <span>
-                              <span className="mr-2 font-bold">{String.fromCharCode(65 + i)}.</span>
+                              <span className="mr-2 font-bold">
+                                {String.fromCharCode(65 + i)}.
+                              </span>
                               {opt}
                             </span>
+
                             {isSelected && (
-                              <span className={`font-bold ${q.isCorrect ? "text-success" : "text-destructive"}`}>
+                              <span
+                                className={`font-bold ${
+                                  q.isCorrect
+                                    ? "text-success"
+                                    : "text-destructive"
+                                }`}
+                              >
                                 {selectedMarker}
                               </span>
                             )}
@@ -172,7 +258,9 @@ const ResultPage = () => {
                   </Button>
                 </Link>
                 <Link to="/profile" className="flex-1">
-                  <Button className="w-full gradient-hero text-primary-foreground">View Profile</Button>
+                  <Button className="w-full gradient-hero text-primary-foreground">
+                    View Profile
+                  </Button>
                 </Link>
               </div>
             </CardContent>
