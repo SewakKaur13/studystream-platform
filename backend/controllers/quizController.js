@@ -76,6 +76,14 @@ const updateQuiz = async (req, res) => {
         }
       });
     }
+    if (quizData.questions && quizData.questions.length > 0) {
+      quizData.questions = quizData.questions.map((q) => ({
+        questionText: q.text || q.questionText || "",
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        questionImage: q.questionImage || null,
+      }));
+    }
 
     // Update DB
     const updatedQuiz = await Quiz.findByIdAndUpdate(
