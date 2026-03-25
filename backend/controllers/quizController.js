@@ -58,42 +58,37 @@ const getQuizById = async (req, res) => {
 // UPDATE QUIZ
 const updateQuiz = async (req, res) => {
   try {
-    const quizData = JSON.parse(req.body.data);
+    console.log("BODY:", req.body);
+    console.log("FILES:", req.files);
 
-    // get existing quiz
-    const existingQuiz = await Quiz.findById(req.params.id);
+    // Parse JSON safely
+    let quizData = req.body.data
+      ? JSON.parse(req.body.data)
+      : req.body;
 
-    if (!existingQuiz) {
-      return res.status(404).json({ message: "Quiz not found" });
+    // Attach uploaded images
+    if (req.files && req.files.length > 0) {
+      req.files.forEach((file) => {
+        const index = file.fieldname.split("-")[1];
+
+        if (quizData.questions[index]) {
+          quizData.questions[index].questionImage = file.path;
+        }
+      });
     }
 
-    // map existing images
-    const existingQuestions = existingQuiz.questions;
-
-    // attach new images OR keep old ones
-    quizData.questions = quizData.questions.map((q, index) => {
-      let updatedQuestion = { ...q };
-
-      const uploadedFile = req.files.find(
-        (file) => file.fieldname === `questionImage-${index}`
-      );
-
-      if (uploadedFile) {
-        updatedQuestion.questionImage = uploadedFile.path;
-      } else {
-        // keep old image
-        updatedQuestion.questionImage =
-          existingQuestions[index]?.questionImage || null;
-      }
-
-      return updatedQuestion;
-    });
-
+    // Update DB
     const updatedQuiz = await Quiz.findByIdAndUpdate(
       req.params.id,
       quizData,
       { new: true }
     );
+
+    if (!updatedQuiz) {
+      return res.status(404).json({
+        message: "Quiz not found",
+      });
+    }
 
     res.json({
       message: "Quiz updated successfully",
@@ -101,6 +96,7 @@ const updateQuiz = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("UPDATE ERROR:", error);
     res.status(500).json({
       message: error.message,
     });
