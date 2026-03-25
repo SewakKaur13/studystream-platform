@@ -585,24 +585,25 @@ const QuizForm = ({
     quiz?.marksPerQuestion || 2,
   );
   const [questions, setQuestions] = useState<Question[]>(
-    quiz?.questions
-      ? quiz.questions.map((q: any) => ({
-          ...q,
+  quiz?.questions
+    ? quiz.questions.map((q: any) => ({
+        ...q,
+        text: q.questionText || "",
+        imageFile: null,
+        imagePreview: null,
+      }))
+    : [
+        {
+          id: `q_${Date.now()}`,
+          text: "",
+          options: ["", "", "", ""],
+          correctAnswer: 0,
           imageFile: null,
           imagePreview: null,
-        }))
-      : [
-          {
-            id: `q_${Date.now()}`,
-            text: "",
-            options: ["", "", "", ""],
-            correctAnswer: 0,
-            imageFile: null,
-            imagePreview: null,
-            questionImage: null,
-          },
-        ],
-  );
+          questionImage: null,
+        },
+      ]
+);
 
   const addQuestion = () => {
     setQuestions([
