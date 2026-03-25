@@ -7,15 +7,14 @@ const {
   getQuizById,
   updateQuiz,
   deleteQuiz,
-  // getQuizLockStatus
 } = require("../controllers/quizController");
-const{ verifyUser } = require("../middleware/authMiddleware");
+const upload =require("../config/multer");
 
-router.post("/create-quiz", createQuiz);
+router.post("/create-quiz",upload.any(), createQuiz);
 router.get("/all-quizzes", getAllQuizzes);
 router.get("/get-quiz/:id", getQuizById);
-router.put("/update-quiz/:id", updateQuiz);
+router.put("/update-quiz/:id",upload.any(), updateQuiz);
 router.delete("/delete-quiz/:id", deleteQuiz);
-// router.get("/quiz-lock-status/:id", verifyUser, getQuizLockStatus);
+
 
 module.exports = router;

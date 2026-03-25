@@ -3,6 +3,9 @@ export interface Question {
   text: string;
   options: string[];
   correctAnswer: number; // index
+  imageFile?: File | null;     // for upload
+  imagePreview?: string | null; // for UI preview
+  questionImage?: string | null; // for existing (edit mode)
 }
 
 export interface Quiz {

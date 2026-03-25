@@ -5,6 +5,10 @@ const questionSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  questionImage: {
+    type: String,
+    default: null,
+  },
   options: {
     type: [String],
     validate: [(arr) => arr.length === 4, "Must provide exactly 4 options"],

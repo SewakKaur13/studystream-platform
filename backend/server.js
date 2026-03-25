@@ -24,6 +24,7 @@ app.use(cors({
 /* Middlewares */
 app.use(express.json());
 app.use(cookieParser());
+app.use("/uploads", express.static("uploads"));
 
 /* Routes */
 app.use("/api/auth", authRoutes);

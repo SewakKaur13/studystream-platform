@@ -371,27 +371,61 @@ const QuizPage = () => {
             <p className="text-sm text-muted-foreground">
               Question {currentQ + 1} of {quiz.questions.length}
             </p>
-            <CardTitle className="text-xl">
-              {q.text.split(";").map((row, i) => {
-                const isTable = row.includes("|");
+            <CardTitle className="text-xl space-y-3">
+              {(() => {
+                const rows = q.text.split(";");
+
+                const tableRows = rows.filter((r) => r.includes("|"));
+                const normalText = rows.filter((r) => !r.includes("|"));
 
                 return (
-                  <div
-                    key={i}
-                    className={
-                      isTable
-                        ? "grid grid-cols-7 gap-2 text-sm overflow-x-auto"
-                        : "mb-3 font-medium"
-                    }
-                  >
-                    {isTable
-                      ? row
-                          .split("|")
-                          .map((col, j) => <span key={j}>{col}</span>)
-                      : row}
-                  </div>
+                  <>
+                    {/* Normal Question Text */}
+                    {normalText.map((text, i) => (
+                      <p key={i} className="font-medium">
+                        {text}
+                      </p>
+                    ))}
+
+                    {/* TABLE */}
+                    {tableRows.length > 0 && (
+                      <div className="overflow-x-auto custom-scrollbar border rounded-lg">
+                        <table className="min-w-[700px] w-full border-collapse">
+                          {/* Header */}
+                          <thead>
+                            <tr className="bg-muted">
+                              {tableRows[0].split("|").map((col, i) => (
+                                <th
+                                  key={i}
+                                  className="border px-4 py-2 text-sm font-semibold text-center"
+                                >
+                                  {col}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+
+                          {/* Body */}
+                          <tbody>
+                            {tableRows.slice(1).map((row, i) => (
+                              <tr key={i} className="hover:bg-muted/50">
+                                {row.split("|").map((col, j) => (
+                                  <td
+                                    key={j}
+                                    className="border px-4 py-2 text-sm text-center"
+                                  >
+                                    {col}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
                 );
-              })}
+              })()}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">

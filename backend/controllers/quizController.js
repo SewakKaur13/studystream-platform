@@ -5,19 +5,31 @@ const QuizLock = require ("../models/QuizLock");
 // CREATE QUIZ
 const createQuiz = async (req, res) => {
   try {
+    //parse JSON data
+    const quizData = JSON.parse(req.body.data);
 
-    const quiz = new Quiz(req.body);
+    //attach images if present
+    if (req.files && req.files.length > 0) {
+      req.files.forEach((file) => {
+        const index = file.fieldname.split("-")[1];
 
+        if (quizData.questions[index]) {
+          quizData.questions[index].questionImage = file.path;
+        }
+      });
+    }
+
+    const quiz = new Quiz(quizData);
     await quiz.save();
 
     res.json({
       message: "Quiz created successfully",
-      quiz
+      quiz,
     });
 
   } catch (error) {
     res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -46,27 +58,51 @@ const getQuizById = async (req, res) => {
 // UPDATE QUIZ
 const updateQuiz = async (req, res) => {
   try {
+    const quizData = JSON.parse(req.body.data);
+
+    // get existing quiz
+    const existingQuiz = await Quiz.findById(req.params.id);
+
+    if (!existingQuiz) {
+      return res.status(404).json({ message: "Quiz not found" });
+    }
+
+    // map existing images
+    const existingQuestions = existingQuiz.questions;
+
+    // attach new images OR keep old ones
+    quizData.questions = quizData.questions.map((q, index) => {
+      let updatedQuestion = { ...q };
+
+      const uploadedFile = req.files.find(
+        (file) => file.fieldname === `questionImage-${index}`
+      );
+
+      if (uploadedFile) {
+        updatedQuestion.questionImage = uploadedFile.path;
+      } else {
+        // keep old image
+        updatedQuestion.questionImage =
+          existingQuestions[index]?.questionImage || null;
+      }
+
+      return updatedQuestion;
+    });
 
     const updatedQuiz = await Quiz.findByIdAndUpdate(
       req.params.id,
-      req.body,
-      { returnDocument: "after" }
+      quizData,
+      { new: true }
     );
-
-    if (!updatedQuiz) {
-      return res.status(404).json({
-        message: "Quiz not found"
-      });
-    }
 
     res.json({
       message: "Quiz updated successfully",
-      quiz: updatedQuiz
+      quiz: updatedQuiz,
     });
 
   } catch (error) {
     res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
 };

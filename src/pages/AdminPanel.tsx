@@ -73,51 +73,45 @@ const AdminPanel = () => {
       console.error("Failed to fetch analytics", error);
     }
   };
- const handleExportPDF = () => {
-  const doc = new jsPDF();
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
 
-  const fileName = `${analyticsQuizTitle}_Result.pdf`;
+    const fileName = `${analyticsQuizTitle}_Result.pdf`;
 
-  // Title
-  doc.setFontSize(14);
-  doc.text(`${analyticsQuizTitle} - Results`, 14, 15);
+    // Title
+    doc.setFontSize(14);
+    doc.text(`${analyticsQuizTitle} - Results`, 14, 15);
 
-  // Columns
-  const tableColumn = [
-    "Enrollment",
-    "Name",
-    "Score",
-    "Percentage",
-    "Mode",
-  ];
+    // Columns
+    const tableColumn = ["Enrollment", "Name", "Score", "Percentage", "Mode"];
 
-  // Rows
-  const tableRows = analyticsData?.map((item) => [
-    item.enrollmentNumber,
-    item.studentName,
-    item.score,
-    `${item.percentage}%`,
-    item.submitMode === "cheating" ? "Cheating" : "Submitted",
-  ]);
+    // Rows
+    const tableRows = analyticsData?.map((item) => [
+      item.enrollmentNumber,
+      item.studentName,
+      item.score,
+      `${item.percentage}%`,
+      item.submitMode === "cheating" ? "Cheating" : "Submitted",
+    ]);
 
-  autoTable(doc, {
-    head: [tableColumn],
-    body: tableRows,
-    startY: 20,
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 20,
 
-    // background color for cheating rows
-    didParseCell: function (data) {
-      const rowIndex = data.row.index;
-      const item = analyticsData[rowIndex];
+      // background color for cheating rows
+      didParseCell: function (data) {
+        const rowIndex = data.row.index;
+        const item = analyticsData[rowIndex];
 
-      if (item?.submitMode === "cheating") {
-        data.cell.styles.fillColor = [255, 230, 230];
-      }
-    },
-  });
+        if (item?.submitMode === "cheating") {
+          data.cell.styles.fillColor = [255, 230, 230];
+        }
+      },
+    });
 
-  doc.save(fileName);
-};
+    doc.save(fileName);
+  };
 
   //api call of dashboard stats
   const fetchDashboard = async () => {
@@ -259,26 +253,28 @@ const AdminPanel = () => {
               </DialogHeader>
               <QuizForm
                 quiz={editQuiz}
-                onSave={async (q) => {
+                onSave={async (formData) => {
                   try {
-                    const payload = {
-                      ...q,
-                      questions: q.questions?.map((ques) => ({
-                        questionText: ques.text,
-                        options: ques.options,
-                        correctAnswer: ques.correctAnswer,
-                      })),
-                    };
-
                     let res;
+
+                    const quizData = JSON.parse(formData.get("data") as string);
 
                     if (editQuiz) {
                       res = await api.put(
-                        `/quiz/update-quiz/${q?._id}`,
-                        payload,
+                        `/quiz/update-quiz/${quizData._id}`,
+                        formData,
+                        {
+                          headers: {
+                            "Content-Type": "multipart/form-data",
+                          },
+                        },
                       );
                     } else {
-                      res = await api.post("/quiz/create-quiz", payload);
+                      res = await api.post("/quiz/create-quiz", formData, {
+                        headers: {
+                          "Content-Type": "multipart/form-data",
+                        },
+                      });
                     }
 
                     toast.success(res.data.message);
@@ -463,7 +459,6 @@ const AdminPanel = () => {
             <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
               {/* Modal Box */}
               <div className="bg-white rounded-lg shadow-lg w-full max-w-5xl h-[85vh] flex flex-col relative">
-
                 {/* Header */}
                 <div className="flex justify-between items-center p-4 border-b">
                   <h2 className="text-lg font-semibold">
@@ -580,7 +575,7 @@ const QuizForm = ({
   onSave,
 }: {
   quiz: QuizDetail | null;
-  onSave: (q: QuizDetail) => void;
+  onSave: (formData: FormData) => void;
 }) => {
   const [title, setTitle] = useState(quiz?.title || "");
   const [description, setDescription] = useState(quiz?.description || "");
@@ -590,14 +585,23 @@ const QuizForm = ({
     quiz?.marksPerQuestion || 2,
   );
   const [questions, setQuestions] = useState<Question[]>(
-    quiz?.questions || [
-      {
-        id: `q_${Date.now()}`,
-        text: "",
-        options: ["", "", "", ""],
-        correctAnswer: 0,
-      },
-    ],
+    quiz?.questions
+      ? quiz.questions.map((q: any) => ({
+          ...q,
+          imageFile: null,
+          imagePreview: null,
+        }))
+      : [
+          {
+            id: `q_${Date.now()}`,
+            text: "",
+            options: ["", "", "", ""],
+            correctAnswer: 0,
+            imageFile: null,
+            imagePreview: null,
+            questionImage: null,
+          },
+        ],
   );
 
   const addQuestion = () => {
@@ -608,6 +612,9 @@ const QuizForm = ({
         text: "",
         options: ["", "", "", ""],
         correctAnswer: 0,
+        imageFile: null,
+        imagePreview: null,
+        questionImage: null,
       },
     ]);
   };
@@ -638,28 +645,79 @@ const QuizForm = ({
     }
 
     if (
-      questions.some((q) => !q.text.trim() || q.options.some((o) => !o.trim()))
+      questions.some(
+        (q) =>
+          (!q.text.trim() && !q.imageFile && !q.questionImage) ||
+          q.options.some((o) => !o.trim()),
+      )
     ) {
-      toast.error("All questions and options must be filled");
+      toast.error(
+        "Each question must have text or image and all options filled",
+      );
       return;
     }
 
     try {
       setLoading(true);
 
-      await onSave({
+      const formData = new FormData();
+
+      // ✅ JSON data (without files)
+      const quizPayload = {
         _id: quiz?._id,
         title: title.trim(),
         description: description.trim(),
         duration: timeLimit,
         marksPerQuestion,
-        questions,
+        questions: questions.map((q) => ({
+          text: q.text,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+          questionImage: q.questionImage || null, // existing image
+        })),
+      };
+
+      formData.append("data", JSON.stringify(quizPayload));
+
+      // ✅ Attach images separately
+      questions.forEach((q, index) => {
+        if (q.imageFile) {
+          formData.append(`questionImage-${index}`, q.imageFile);
+        }
       });
+
+      await onSave(formData); // 🔥 send FormData now
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleImageChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    idx: number,
+  ) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    const updated = [...questions];
+
+    updated[idx].imageFile = file;
+    updated[idx].imagePreview = URL.createObjectURL(file);
+
+    setQuestions(updated);
+  };
+
+  const removeImage = (idx: number) => {
+    const updated = [...questions];
+
+    updated[idx].imageFile = null;
+    updated[idx].imagePreview = null;
+    updated[idx].questionImage = null;
+
+    setQuestions(updated);
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -719,6 +777,7 @@ const QuizForm = ({
             key={q.id}
             className="rounded-lg border border-border p-4 space-y-3"
           >
+            {/* Header */}
             <div className="flex items-start justify-between">
               <Label className="text-sm font-medium">Q{qi + 1}</Label>
               {questions.length > 1 && (
@@ -731,11 +790,47 @@ const QuizForm = ({
                 </button>
               )}
             </div>
+
+            {/* Question Text */}
             <Input
               value={q.text}
               onChange={(e) => updateQuestion(qi, "text", e.target.value)}
               placeholder="Question text (use | for columns and ; for rows if table needed)"
             />
+
+            {/* IMAGE UPLOAD SECTION */}
+            <div className="space-y-2">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleImageChange(e, qi)}
+              />
+
+              {(q.imagePreview || q.questionImage) && (
+                <div className="relative w-fit">
+                  <img
+                    src={
+                      q.imagePreview
+                        ? q.imagePreview
+                        : `https://study-stream-api.onrender.com/${q.questionImage}`
+                    }
+                    alt="question"
+                    className="w-40 h-auto rounded border"
+                  />
+
+                  {/* Remove Image */}
+                  <button
+                    type="button"
+                    onClick={() => removeImage(qi)}
+                    className="absolute top-0 right-0 bg-white rounded-full p-1 shadow"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Options */}
             {q.options?.map((opt, oi) => (
               <div key={oi} className="flex items-center gap-2">
                 <input
@@ -753,6 +848,7 @@ const QuizForm = ({
                 />
               </div>
             ))}
+
             <p className="text-xs text-muted-foreground">
               Select the radio button next to the correct answer
             </p>
