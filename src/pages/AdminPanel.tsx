@@ -606,22 +606,24 @@ const QuizForm = ({
   );
 
   useEffect(() => {
-  if (quiz) {
-    setTitle(quiz.title || "");
-    setDescription(quiz.description || "");
-    setTimeLimit(quiz.duration || 15);
-    setMarksPerQuestion(quiz.marksPerQuestion || 2);
+    if (quiz) {
+      setTitle(quiz.title || "");
+      setDescription(quiz.description || "");
+      setTimeLimit(quiz.duration || 15);
+      setMarksPerQuestion(quiz.marksPerQuestion || 2);
 
-    setQuestions(
-      quiz.questions?.map((q: any) => ({
-        ...q,
-        text: q.questionText || "",
-        imageFile: null,
-        imagePreview: null,
-      })) || []
-    );
-  }
-}, [quiz]);
+      setQuestions(
+        quiz.questions?.map((q: any) => ({
+          ...q,
+          text: q.questionText || "",
+          imageFile: null,
+          imagePreview: null,
+        })) || [],
+      );
+    }
+  }, [quiz]);
+   console.log("quiz:", quiz);
+  console.log("questions state:", questions);
   const addQuestion = () => {
     setQuestions([
       ...questions,
@@ -792,7 +794,7 @@ const QuizForm = ({
         </div>
         {questions?.map((q, qi) => (
           <div
-            key={q.id}
+            key={q._id || q.id}
             className="rounded-lg border border-border p-4 space-y-3"
           >
             {/* Header */}
