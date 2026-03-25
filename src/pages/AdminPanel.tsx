@@ -606,17 +606,22 @@ const QuizForm = ({
   );
 
   useEffect(() => {
-    if (quiz?.questions) {
-      setQuestions(
-        quiz.questions.map((q: any) => ({
-          ...q,
-          text: q.questionText || "",
-          imageFile: null,
-          imagePreview: null,
-        })),
-      );
-    }
-  }, [quiz]);
+  if (quiz) {
+    setTitle(quiz.title || "");
+    setDescription(quiz.description || "");
+    setTimeLimit(quiz.duration || 15);
+    setMarksPerQuestion(quiz.marksPerQuestion || 2);
+
+    setQuestions(
+      quiz.questions?.map((q: any) => ({
+        ...q,
+        text: q.questionText || "",
+        imageFile: null,
+        imagePreview: null,
+      })) || []
+    );
+  }
+}, [quiz]);
   const addQuestion = () => {
     setQuestions([
       ...questions,
