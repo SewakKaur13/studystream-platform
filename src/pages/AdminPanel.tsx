@@ -181,6 +181,7 @@ const AdminPanel = () => {
           text: q.questionText, // map questionText → text
           options: q.options,
           correctAnswer: q.correctAnswer,
+          questionImage: q.questionImage || null,
         })),
         createdAt: data.createdAt,
       };
