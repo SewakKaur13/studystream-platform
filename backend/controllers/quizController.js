@@ -1,6 +1,6 @@
 const Quiz = require("../models/Quiz");
 const Attempt = require("../models/Attempt");
-const QuizLock = require ("../models/QuizLock");
+const QuizLock = require("../models/QuizLock");
 
 // CREATE QUIZ
 const createQuiz = async (req, res) => {
@@ -26,7 +26,6 @@ const createQuiz = async (req, res) => {
       message: "Quiz created successfully",
       quiz,
     });
-
   } catch (error) {
     res.status(500).json({
       message: error.message,
@@ -37,20 +36,18 @@ const createQuiz = async (req, res) => {
 // GET QUIZ BY ID
 const getQuizById = async (req, res) => {
   try {
-
     const quiz = await Quiz.findById(req.params.id);
 
     if (!quiz) {
       return res.status(404).json({
-        message: "Quiz not found"
+        message: "Quiz not found",
       });
     }
 
     res.json(quiz);
-
   } catch (error) {
     res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -62,9 +59,7 @@ const updateQuiz = async (req, res) => {
     console.log("FILES:", req.files);
 
     // Parse JSON safely
-    let quizData = req.body.data
-      ? JSON.parse(req.body.data)
-      : req.body;
+    let quizData = req.body.data ? JSON.parse(req.body.data) : req.body;
 
     // Attach uploaded images
     if (req.files && req.files.length > 0) {
@@ -76,21 +71,27 @@ const updateQuiz = async (req, res) => {
         }
       });
     }
-    if (quizData.questions && quizData.questions.length > 0) {
-      quizData.questions = quizData.questions.map((q) => ({
+
+    quizData.questions = quizData.questions.map((q, index) => {
+      // check if new image uploaded for this question
+      const uploadedFile = req.files?.find(
+        (f) => f.fieldname === `questionImage-${index}`,
+      );
+
+      return {
         questionText: q.text || q.questionText || "",
         options: q.options,
         correctAnswer: q.correctAnswer,
-        questionImage: q.questionImage || null,
-      }));
-    }
+        questionImage: uploadedFile
+          ? uploadedFile.path
+          : q.questionImage || null, 
+      };
+    });
 
     // Update DB
-    const updatedQuiz = await Quiz.findByIdAndUpdate(
-      req.params.id,
-      quizData,
-      { new: true }
-    );
+    const updatedQuiz = await Quiz.findByIdAndUpdate(req.params.id, quizData, {
+      new: true,
+    });
 
     if (!updatedQuiz) {
       return res.status(404).json({
@@ -102,7 +103,6 @@ const updateQuiz = async (req, res) => {
       message: "Quiz updated successfully",
       quiz: updatedQuiz,
     });
-
   } catch (error) {
     console.error("UPDATE ERROR:", error);
     res.status(500).json({
@@ -114,14 +114,12 @@ const updateQuiz = async (req, res) => {
 //Card View of Quizes
 const getAllQuizzes = async (req, res) => {
   try {
-
     const quizzes = await Quiz.find();
 
     const quizzesWithCounts = await Promise.all(
       quizzes.map(async (q) => {
-
         const attempts = await Attempt.countDocuments({
-          quizId: q._id
+          quizId: q._id,
         });
 
         return {
@@ -132,14 +130,12 @@ const getAllQuizzes = async (req, res) => {
           totalQuestions: q.questions.length,
           attempts: attempts,
           createdAt: q.createdAt,
-          status: q.status
+          status: q.status,
         };
-
-      })
+      }),
     );
 
     res.json(quizzesWithCounts);
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -148,37 +144,32 @@ const getAllQuizzes = async (req, res) => {
 //Delete Quiz
 const deleteQuiz = async (req, res) => {
   try {
-
     const quizId = req.params.id;
 
     const quiz = await Quiz.findByIdAndDelete(quizId);
 
     if (!quiz) {
       return res.status(404).json({
-        message: "Quiz not found"
+        message: "Quiz not found",
       });
     }
 
     await Attempt.deleteMany({ quizId: quizId });
 
     res.json({
-      message: "Quiz deleted successfully"
+      message: "Quiz deleted successfully",
     });
-
   } catch (error) {
     res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
 };
-
-
-
 
 module.exports = {
   createQuiz,
   getQuizById,
   updateQuiz,
   getAllQuizzes,
-  deleteQuiz
+  deleteQuiz,
 };
