@@ -65,8 +65,7 @@ const QuizPage = () => {
           createdAt: new Date().toISOString(),
           status: "active",
         });
-        console.log("FULL QUIZ DATA:", quiz);
-console.log("CURRENT QUESTION:", q);
+
 
         // FIXED TIMER
         setTimeLeft((data.duration || 15) * 60);
@@ -284,6 +283,8 @@ console.log("CURRENT QUESTION:", q);
 
   /** Current question */
   const q = quiz.questions[currentQ];
+  console.log("FULL QUIZ DATA:", quiz);
+console.log("CURRENT QUESTION:", q);
 
   /** Format timer */
   const formatTime = (s: number) => {
@@ -473,7 +474,7 @@ console.log("CURRENT QUESTION:", q);
             ))}
           </CardContent>
         </Card>
-
+            
         {/* Navigation */}
         <div className="mt-6 flex items-center justify-between">
           <Button
