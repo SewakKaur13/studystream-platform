@@ -65,6 +65,8 @@ const QuizPage = () => {
           createdAt: new Date().toISOString(),
           status: "active",
         });
+        console.log("FULL QUIZ DATA:", quiz);
+console.log("CURRENT QUESTION:", q);
 
         // FIXED TIMER
         setTimeLeft((data.duration || 15) * 60);
