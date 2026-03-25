@@ -58,6 +58,7 @@ const QuizPage = () => {
             text: q.questionText,
             options: q.options,
             correctAnswer: 0,
+            questionImage: q.questionImage || null,
           })),
           totalQuestions: data.questions.length,
           attempts: 0,
