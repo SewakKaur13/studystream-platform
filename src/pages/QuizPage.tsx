@@ -371,16 +371,35 @@ const QuizPage = () => {
             <p className="text-sm text-muted-foreground">
               Question {currentQ + 1} of {quiz.questions.length}
             </p>
-            <CardTitle className="text-xl space-y-3">
+
+            <CardTitle className="text-xl space-y-4">
+              {/* QUESTION IMAGE */}
+              {q.questionImage && (
+                <div className="w-full flex justify-center">
+                  <img
+                    src={`https://study-stream-api.onrender.com/${q.questionImage}`}
+                    alt="question"
+                    className="w-full max-h-[400px] object-contain rounded-lg border shadow cursor-pointer"
+                    onClick={() =>
+                      window.open(
+                        `https://study-stream-api.onrender.com/${q.questionImage}`,
+                        "_blank",
+                      )
+                    }
+                  />
+                </div>
+              )}
+
+              {/* QUESTION TEXT + TABLE */}
               {(() => {
-                const rows = q.text.split(";");
+                const rows = (q.text || "").split(";");
 
                 const tableRows = rows.filter((r) => r.includes("|"));
                 const normalText = rows.filter((r) => !r.includes("|"));
 
                 return (
                   <>
-                    {/* Normal Question Text */}
+                    {/* Normal Text */}
                     {normalText.map((text, i) => (
                       <p key={i} className="font-medium">
                         {text}
@@ -428,6 +447,7 @@ const QuizPage = () => {
               })()}
             </CardTitle>
           </CardHeader>
+
           <CardContent className="space-y-3">
             {q.options?.map((opt, i) => (
               <button
@@ -436,7 +456,11 @@ const QuizPage = () => {
                   setAnswers((prev) => ({ ...prev, [q.id]: i }));
                   saveAnswer(q.id, i);
                 }}
-                className={`w-full rounded-lg border p-4 text-left transition-all ${answers[q.id] === i ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-border hover:border-primary/30 hover:bg-muted/50"}`}
+                className={`w-full rounded-lg border p-4 text-left transition-all ${
+                  answers[q.id] === i
+                    ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                    : "border-border hover:border-primary/30 hover:bg-muted/50"
+                }`}
               >
                 <span className="mr-3 inline-flex h-7 w-7 items-center justify-center rounded-full border text-sm font-medium">
                   {String.fromCharCode(65 + i)}
