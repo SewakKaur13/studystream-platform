@@ -5,10 +5,9 @@ const QuizLock = require("../models/QuizLock");
 // CREATE QUIZ
 const createQuiz = async (req, res) => {
   try {
-    //parse JSON data
     const quizData = JSON.parse(req.body.data);
 
-    //attach images if present
+    // attach images
     if (req.files && req.files.length > 0) {
       req.files.forEach((file) => {
         const index = file.fieldname.split("-")[1];
@@ -19,6 +18,15 @@ const createQuiz = async (req, res) => {
       });
     }
 
+    if (quizData.questions && quizData.questions.length > 0) {
+      quizData.questions = quizData.questions.map((q) => ({
+        questionText: q.text || q.questionText || "",
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        questionImage: q.questionImage || null,
+      }));
+    }
+
     const quiz = new Quiz(quizData);
     await quiz.save();
 
@@ -26,6 +34,7 @@ const createQuiz = async (req, res) => {
       message: "Quiz created successfully",
       quiz,
     });
+
   } catch (error) {
     res.status(500).json({
       message: error.message,
