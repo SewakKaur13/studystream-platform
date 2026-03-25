@@ -167,33 +167,66 @@ const ResultPage = () => {
                       </p>
 
                       {/*QUESTION TEXT WITH TABLE SUPPORT */}
-                      <CardTitle className="text-lg space-y-2">
-                        {q.questionText.split(";").map((row, i) => {
-                          const isTableRow = row.includes("|");
+                      <CardTitle className="text-lg space-y-3">
+                        {(() => {
+                          const rows = q.questionText.split(";");
 
-                          return isTableRow ? (
-                            <div key={i} className="overflow-x-auto">
-                              <div className="inline-block border border-border rounded-md">
-                                <div className="flex">
-                                  {row.split("|").map((col, j) => (
-                                    <div
-                                      key={j}
-                                      className={`px-3 py-2 text-sm border-r border-b border-border min-w-[100px] text-center ${
-                                        i === 1 ? "bg-muted font-semibold" : ""
-                                      }`}
-                                    >
-                                      {col}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <p key={i} className="font-medium">
-                              {row}
-                            </p>
+                          const tableRows = rows.filter((r) => r.includes("|"));
+                          const normalText = rows.filter(
+                            (r) => !r.includes("|"),
                           );
-                        })}
+
+                          return (
+                            <>
+                              {/* Normal Text */}
+                              {normalText.map((text, i) => (
+                                <p key={i} className="font-medium">
+                                  {text}
+                                </p>
+                              ))}
+
+                              {/* TABLE */}
+                              {tableRows.length > 0 && (
+                                <div className="overflow-x-auto custom-scrollbar border rounded-lg">
+                                  <table className="min-w-[700px] w-full border-collapse">
+                                    <thead>
+                                      <tr className="bg-muted">
+                                        {tableRows[0]
+                                          .split("|")
+                                          .map((col, i) => (
+                                            <th
+                                              key={i}
+                                              className="border px-4 py-2 text-sm font-semibold text-center"
+                                            >
+                                              {col}
+                                            </th>
+                                          ))}
+                                      </tr>
+                                    </thead>
+
+                                    <tbody>
+                                      {tableRows.slice(1).map((row, i) => (
+                                        <tr
+                                          key={i}
+                                          className="hover:bg-muted/50"
+                                        >
+                                          {row.split("|").map((col, j) => (
+                                            <td
+                                              key={j}
+                                              className="border px-4 py-2 text-sm text-center"
+                                            >
+                                              {col}
+                                            </td>
+                                          ))}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </CardTitle>
                     </CardHeader>
 
