@@ -585,26 +585,38 @@ const QuizForm = ({
     quiz?.marksPerQuestion || 2,
   );
   const [questions, setQuestions] = useState<Question[]>(
-  quiz?.questions
-    ? quiz.questions.map((q: any) => ({
-        ...q,
-        text: q.questionText || "",
-        imageFile: null,
-        imagePreview: null,
-      }))
-    : [
-        {
-          id: `q_${Date.now()}`,
-          text: "",
-          options: ["", "", "", ""],
-          correctAnswer: 0,
+    quiz?.questions
+      ? quiz.questions.map((q: any) => ({
+          ...q,
+          text: q.questionText || "",
           imageFile: null,
           imagePreview: null,
-          questionImage: null,
-        },
-      ]
-);
+        }))
+      : [
+          {
+            id: `q_${Date.now()}`,
+            text: "",
+            options: ["", "", "", ""],
+            correctAnswer: 0,
+            imageFile: null,
+            imagePreview: null,
+            questionImage: null,
+          },
+        ],
+  );
 
+  useEffect(() => {
+    if (quiz?.questions) {
+      setQuestions(
+        quiz.questions.map((q: any) => ({
+          ...q,
+          text: q.questionText || "",
+          imageFile: null,
+          imagePreview: null,
+        })),
+      );
+    }
+  }, [quiz]);
   const addQuestion = () => {
     setQuestions([
       ...questions,
@@ -663,7 +675,7 @@ const QuizForm = ({
 
       const formData = new FormData();
 
-      // ✅ JSON data (without files)
+      // JSON data (without files)
       const quizPayload = {
         _id: quiz?._id,
         title: title.trim(),
@@ -680,14 +692,14 @@ const QuizForm = ({
 
       formData.append("data", JSON.stringify(quizPayload));
 
-      // ✅ Attach images separately
+      //Attach images separately
       questions.forEach((q, index) => {
         if (q.imageFile) {
           formData.append(`questionImage-${index}`, q.imageFile);
         }
       });
 
-      await onSave(formData); // 🔥 send FormData now
+      await onSave(formData);
     } catch (err) {
       console.error(err);
     } finally {
