@@ -605,28 +605,28 @@ const QuizForm = ({
         ],
   );
 
- useEffect(() => {
-  if (quiz) {
-    setTitle(quiz.title || "");
-    setDescription(quiz.description || "");
-    setTimeLimit(quiz.duration || 15);
-    setMarksPerQuestion(quiz.marksPerQuestion || 2);
+  useEffect(() => {
+    if (quiz) {
+      setTitle(quiz.title || "");
+      setDescription(quiz.description || "");
+      setTimeLimit(quiz.duration || 15);
+      setMarksPerQuestion(quiz.marksPerQuestion || 2);
 
-    setQuestions(
-      quiz.questions?.map((q: any) => ({
-        ...q,
-        text: q.text || q.questionText || "",
+      setQuestions(
+        quiz.questions?.map((q: any) => ({
+          ...q,
+          text: q.text || q.questionText || "",
 
-        // IMPORTANT FIX FOR IMAGE
-        questionImage: q.questionImage || null,
+          // IMPORTANT FIX FOR IMAGE
+          questionImage: q.questionImage || null,
 
-        imageFile: null,
-        imagePreview: null,
-      })) || []
-    );
-  }
-}, [quiz]);
-   console.log("quiz:", quiz);
+          imageFile: null,
+          imagePreview: null,
+        })) || [],
+      );
+    }
+  }, [quiz]);
+  console.log("quiz:", quiz);
   console.log("questions state:", questions);
   const addQuestion = () => {
     setQuestions([
@@ -836,7 +836,9 @@ const QuizForm = ({
                     src={
                       q.imagePreview
                         ? q.imagePreview
-                        : `https://study-stream-api.onrender.com/${q.questionImage}`
+                        : q.questionImage
+                          ? `https://study-stream-api.onrender.com/${q.questionImage}`
+                          : ""
                     }
                     alt="question"
                     className="w-40 h-auto rounded border"
