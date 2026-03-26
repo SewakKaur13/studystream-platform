@@ -32,11 +32,6 @@ app.use("/api/quiz", quizRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/student", studentRoutes);
 
-app._router.stack.forEach((r) => {
-  if (r.route && r.route.path) {
-    console.log(r.route.path);
-  }
-});
 /* Test Route */
 app.get("/", (req, res) => {
   res.send("Quiz API running");
