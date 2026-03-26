@@ -14,7 +14,7 @@ const getStudentDashboard = async (req, res) => {
     // ✅ populate quiz to get questions
     const attempts = await Attempt.find({ studentId }).populate(
       "quizId",
-      "questions"
+      "questions",
     );
 
     const totalQuizzes = quizzes.length;
@@ -45,7 +45,7 @@ const getStudentDashboard = async (req, res) => {
 
     const quizzesWithLockInfo = quizzes.map((quiz) => {
       const lock = locks.find(
-        (l) => l.quizId.toString() === quiz._id.toString()
+        (l) => l.quizId.toString() === quiz._id.toString(),
       );
 
       return {
@@ -237,13 +237,15 @@ const submitQuiz = async (req, res) => {
 
     resultDetails.push({
       questionText: question.questionText,
-      questionImage: question.questionImage || null,
+      questionImage: question.questionImage ? question.questionImage : null,
       options: question.options,
       selectedOption: ans.selectedOption,
       correctAnswer: question.correctAnswer,
       isCorrect,
     });
   });
+  console.log("QUESTION OBJECT:", question);
+  console.log("IMAGE FROM DB:", question.questionImage);
 
   attempt.score = score;
   attempt.correctCount = correct;
@@ -257,9 +259,7 @@ const submitQuiz = async (req, res) => {
   const lockDurationAuto = 12 * 60 * 60 * 1000;
   const lockDurationManual = 24 * 60 * 60 * 1000;
 
-  const lockDuration = autoSubmitted
-    ? lockDurationAuto
-    : lockDurationManual;
+  const lockDuration = autoSubmitted ? lockDurationAuto : lockDurationManual;
 
   await QuizLock.findOneAndUpdate(
     {
@@ -269,7 +269,7 @@ const submitQuiz = async (req, res) => {
     {
       lockedUntil: new Date(Date.now() + lockDuration),
     },
-    { upsert: true }
+    { upsert: true },
   );
 
   res.json({
