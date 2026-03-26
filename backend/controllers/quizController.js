@@ -64,9 +64,6 @@ const getQuizById = async (req, res) => {
 // UPDATE QUIZ
 const updateQuiz = async (req, res) => {
   try {
-    console.log("BODY:", req.body);
-    console.log("FILES:", req.files);
-
     // Parse JSON safely
     let quizData = req.body.data ? JSON.parse(req.body.data) : req.body;
 
@@ -113,7 +110,6 @@ const updateQuiz = async (req, res) => {
       quiz: updatedQuiz,
     });
   } catch (error) {
-    console.error("UPDATE ERROR:", error);
     res.status(500).json({
       message: error.message,
     });

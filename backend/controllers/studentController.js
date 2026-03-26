@@ -146,7 +146,6 @@ const startQuiz = async (req, res) => {
         questionImage: q.questionImage || null,
       }));
     }
-    console.log("SENDING QUESTIONS:", questionsToSend);
     res.json({
       attemptId: attempt._id,
       quizId: quiz._id,
@@ -238,6 +237,7 @@ const submitQuiz = async (req, res) => {
 
     resultDetails.push({
       questionText: question.questionText,
+      questionImage: question.questionImage || null,
       options: question.options,
       selectedOption: ans.selectedOption,
       correctAnswer: question.correctAnswer,

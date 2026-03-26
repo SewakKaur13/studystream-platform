@@ -158,7 +158,7 @@ const QuizPage = () => {
       // If student switches tabs 3 times
       if (tabSwitchRef.current >= 3) {
         try {
-          // call backend to lock quiz for 2 hours
+          // call backend to lock quiz for 12 hours
           await api.post("/student/lock-quiz", {
             quizId: quiz._id,
           });

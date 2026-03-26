@@ -15,6 +15,7 @@ import api from "@/api/axios";
 
 interface ResultDetail {
   questionText: string;
+  questionImage?: string;
   options: string[];
   selectedOption: number;
   correctAnswer: number;
@@ -168,6 +169,22 @@ const ResultPage = () => {
 
                       {/*QUESTION TEXT WITH TABLE SUPPORT */}
                       <CardTitle className="text-lg space-y-3">
+                        {/*QUESTION IMAGE */}
+                        {q.questionImage && (
+                          <div className="w-full flex justify-center">
+                            <img
+                              src={`https://study-stream-api.onrender.com/${q.questionImage}`}
+                              alt="question"
+                              className="w-full max-h-[400px] object-contain rounded-lg border shadow cursor-pointer"
+                              onClick={() =>
+                                window.open(
+                                  `https://study-stream-api.onrender.com/${q.questionImage}`,
+                                  "_blank",
+                                )
+                              }
+                            />
+                          </div>
+                        )}
                         {(() => {
                           const rows = q.questionText.split(";");
 
@@ -179,7 +196,7 @@ const ResultPage = () => {
                           return (
                             <>
                               {/* Normal Text */}
-                              {normalText.map((text, i) => (
+                              {normalText?.map((text, i) => (
                                 <p key={i} className="font-medium">
                                   {text}
                                 </p>
@@ -292,7 +309,7 @@ const ResultPage = () => {
                 </Link>
                 <Link to="/profile" className="flex-1">
                   <Button className="w-full gradient-hero text-primary-foreground">
-                    View Profile
+                    View Progress
                   </Button>
                 </Link>
               </div>
