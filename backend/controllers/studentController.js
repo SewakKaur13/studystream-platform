@@ -132,20 +132,21 @@ const startQuiz = async (req, res) => {
     if (attempt.answers.length === 0) {
       questionsToSend = quiz.questions
         .sort(() => 0.5 - Math.random())
-        .map((q) => ({
+        ?.map((q) => ({
           _id: q._id,
           questionText: q.questionText,
+          questionImage: q.questionImage || null,
           options: q.options,
         }));
     } else {
-      questionsToSend = quiz.questions.map((q) => ({
+      questionsToSend = quiz.questions?.map((q) => ({
         _id: q._id,
         questionText: q.questionText,
         options: q.options,
         questionImage: q.questionImage || null,
       }));
     }
-
+    console.log("SENDING QUESTIONS:", questionsToSend);
     res.json({
       attemptId: attempt._id,
       quizId: quiz._id,
