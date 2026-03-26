@@ -241,6 +241,7 @@ const submitQuiz = async (req, res) => {
       selectedOption: ans.selectedOption,
       correctAnswer: question.correctAnswer,
       isCorrect,
+      questionImage: question.questionImage || null,
     });
   });
 
@@ -275,6 +276,37 @@ const submitQuiz = async (req, res) => {
     correct,
     wrong,
     resultDetails,
+  });
+};
+
+const getQuizResult = async (req, res) => {
+  const { attemptId } = req.params;
+
+  const attempt = await Attempt.findById(attemptId);
+  const quiz = await Quiz.findById(attempt.quizId);
+
+  const resultDetails = attempt.answers.map(ans => {
+    const question = quiz.questions.id(ans.questionId);
+    const isCorrect = question.correctAnswer === ans.selectedOption;
+
+    return {
+      questionText: question.questionText,
+      options: question.options,
+      selectedOption: ans.selectedOption,
+      correctAnswer: question.correctAnswer,
+      isCorrect,
+      questionImage: question.questionImage || null,
+    };
+  });
+
+  res.json({
+    obtainedMarks: attempt.score,
+    totalMarks: quiz.questions.length * quiz.marksPerQuestion,
+    correct: attempt.correctCount,
+    wrong: attempt.wrongCount,
+    autoSubmitted: attempt.autoSubmitted,
+    resultDetails,
+    quizTitle: quiz.title,
   });
 };
 
@@ -443,6 +475,7 @@ module.exports = {
   saveAnswer,
   updateTabSwitch,
   submitQuiz,
+  getQuizResult,
   getRecentAttempts,
   getStudentProgress,
   lockQuiz,
