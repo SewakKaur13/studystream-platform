@@ -53,6 +53,11 @@ const ResultPage = () => {
     fetchResult();
   }, [attemptId, result]);
 
+  useEffect(() => {
+  console.log("FULL RESULT:", result);
+  console.log("RESULT DETAILS:", result?.resultDetails);
+}, [result]);
+
   if (!result)
     return (
       <div className="flex min-h-screen items-center justify-center">
