@@ -11,7 +11,7 @@ const getStudentDashboard = async (req, res) => {
       createdAt: -1,
     });
 
-    // ✅ populate quiz to get questions
+    // populate quiz to get questions
     const attempts = await Attempt.find({ studentId }).populate(
       "quizId",
       "questions",
@@ -37,7 +37,7 @@ const getStudentDashboard = async (req, res) => {
       avgScore = (totalPercentage / totalAttempted).toFixed(2);
     }
 
-    // 🔒 Lock logic (unchanged)
+    // Lock logic (unchanged)
     const locks = await QuizLock.find({
       studentId,
       lockedUntil: { $gt: now },
@@ -237,15 +237,12 @@ const submitQuiz = async (req, res) => {
 
     resultDetails.push({
       questionText: question.questionText,
-      questionImage: question.questionImage ? question.questionImage : null,
       options: question.options,
       selectedOption: ans.selectedOption,
       correctAnswer: question.correctAnswer,
       isCorrect,
     });
   });
-  console.log("QUESTION OBJECT:", question);
-  console.log("IMAGE FROM DB:", question.questionImage);
 
   attempt.score = score;
   attempt.correctCount = correct;
