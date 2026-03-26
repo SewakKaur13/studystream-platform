@@ -404,7 +404,7 @@ console.log("CURRENT QUESTION:", q);
                 return (
                   <>
                     {/* Normal Text */}
-                    {normalText.map((text, i) => (
+                    {normalText?.map((text, i) => (
                       <p key={i} className="font-medium">
                         {text}
                       </p>

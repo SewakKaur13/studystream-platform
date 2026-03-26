@@ -142,6 +142,7 @@ const startQuiz = async (req, res) => {
         _id: q._id,
         questionText: q.questionText,
         options: q.options,
+        questionImage: q.questionImage || null,
       }));
     }
 
