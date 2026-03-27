@@ -113,6 +113,100 @@ const AdminPanel = () => {
     doc.save(fileName);
   };
 
+  //answer key pdf
+  const handleExportAnswerKey = async (quizId: string, title: string) => {
+  try {
+    const res = await api.get(`/quiz/get-quiz/${quizId}`);
+    const quiz = res.data;
+
+    const doc = new jsPDF();
+    const fileName = `AnswerKey_${title}.pdf`;
+
+    let y = 15;
+
+    doc.setFontSize(14);
+    doc.text(`Answer Key - ${title}`, 14, y);
+
+    y += 10;
+
+    for (let i = 0; i < quiz.questions.length; i++) {
+      const q = quiz.questions[i];
+
+      //Question Number
+      doc.setFontSize(11);
+      doc.text(`Q${i + 1}:`, 14, y);
+      y += 6;
+
+      // Handle TEXT + TABLE
+      const rows = q.questionText.split(";");
+
+      for (let row of rows) {
+        if (row.includes("|")) {
+          // TABLE
+          const tableData = row.split("|")?.map((col) => col.trim());
+
+          autoTable(doc, {
+            startY: y,
+            head: [tableData],
+            body: [],
+            theme: "grid",
+            styles: { fontSize: 9 },
+          });
+
+          y = doc.lastAutoTable.finalY + 5;
+        } else {
+          doc.text(row, 14, y);
+          y += 5;
+        }
+      }
+
+      //IMAGE (if exists)
+      if (q.image) {
+        try {
+          const img = new Image();
+          img.src = `${`https://study-stream-api.onrender.com/`}${q.questionImage}`;
+
+          await new Promise((resolve) => {
+            img.onload = resolve;
+          });
+
+          doc.addImage(img, "JPEG", 14, y, 60, 40);
+          y += 45;
+        } catch (err) {
+          console.log("Image load failed");
+        }
+      }
+
+      //OPTIONS
+      q.options.forEach((opt: string, idx: number) => {
+        const optionText = `${String.fromCharCode(65 + idx)}. ${opt}`;
+
+        if (idx === q.correctAnswer) {
+          doc.setFont(undefined, "bold"); // correct answer bold
+        } else {
+          doc.setFont(undefined, "normal");
+        }
+
+        doc.text(optionText, 14, y);
+        y += 5;
+      });
+
+      y += 8;
+
+      // Page break safety
+      if (y > 270) {
+        doc.addPage();
+        y = 15;
+      }
+    }
+
+    doc.save(fileName);
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to export answer key");
+  }
+};
+
   //api call of dashboard stats
   const fetchDashboard = async () => {
     try {
@@ -404,6 +498,15 @@ const AdminPanel = () => {
                       onClick={() => handleAnalytics(quiz._id, quiz.title)}
                     >
                       View Analytics
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        handleExportAnswerKey(quiz._id, quiz.title)
+                      }
+                    >
+                      Export Answer Key
                     </Button>
                   </div>
                 </CardContent>
