@@ -73,6 +73,8 @@ const AdminPanel = () => {
       console.error("Failed to fetch analytics", error);
     }
   };
+
+  //Results PDF export
   const handleExportPDF = () => {
     const doc = new jsPDF();
 
@@ -111,6 +113,122 @@ const AdminPanel = () => {
     });
 
     doc.save(fileName);
+  };
+
+  const toDataURL = async (url: string): Promise<string> => {
+    const response = await fetch(url);
+
+    const blob = await response.blob();
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onloadend = () => resolve(reader.result as string);
+
+      reader.onerror = reject;
+
+      reader.readAsDataURL(blob);
+    });
+  };
+  // Quiz PDF export
+  const exportQuizPDF = async (quiz: any) => {
+    try {
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+
+      let y = 20;
+
+      // ================= TITLE =================
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(22);
+
+      pdf.text(quiz.title || "Quiz", pageWidth / 2, y, {
+        align: "center",
+      });
+
+      y += 12;
+
+      // ================= DESCRIPTION =================
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+
+      const descriptionLines = pdf.splitTextToSize(quiz.description || "", 170);
+
+      pdf.text(descriptionLines, pageWidth / 2, y, {
+        align: "center",
+      });
+
+      y += descriptionLines.length * 6 + 10;
+
+      // ================= QUESTIONS =================
+      for (let qIndex = 0; qIndex < quiz.questions.length; qIndex++) {
+        const question = quiz.questions[qIndex];
+
+        // New page if needed
+        if (y > 240) {
+          pdf.addPage();
+          y = 20;
+        }
+
+        // ================= QUESTION =================
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(14);
+
+        const questionText = `${qIndex + 1}. ${question.text || ""}`;
+
+        const questionLines = pdf.splitTextToSize(questionText, 180);
+
+        pdf.text(questionLines, 15, y);
+
+        y += questionLines.length * 7 + 4;
+
+        // ================= IMAGE =================
+        if (question.questionImage) {
+          try {
+            const imageUrl = `https://study-stream-api.onrender.com/${question.questionImage}`;
+
+            const imageData = await toDataURL(imageUrl);
+
+            pdf.addImage(imageData, "JPEG", 15, y, 80, 50);
+
+            y += 58;
+          } catch (error) {
+            console.log("Image load failed", error);
+          }
+        }
+
+        // ================= OPTIONS =================
+        question.options.forEach((option: string, index: number) => {
+          if (y > 260) {
+            pdf.addPage();
+            y = 20;
+          }
+
+          const isCorrect = index === question.correctAnswer;
+
+          pdf.setFont("helvetica", isCorrect ? "bold" : "normal");
+
+          pdf.setFontSize(12);
+
+          const optionText = `${String.fromCharCode(65 + index)}. ${option}`;
+
+          const optionLines = pdf.splitTextToSize(optionText, 170);
+
+          pdf.text(optionLines, 25, y);
+
+          y += optionLines.length * 6 + 2;
+        });
+
+        y += 8;
+      }
+
+      // ================= SAVE =================
+      pdf.save(`${quiz.title}.pdf`);
+    } catch (error) {
+      console.log(error);
+      toast.error("Failed to export PDF");
+    }
   };
 
   //api call of dashboard stats
@@ -404,6 +522,13 @@ const AdminPanel = () => {
                       onClick={() => handleAnalytics(quiz._id, quiz.title)}
                     >
                       View Analytics
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => exportQuizPDF(quiz)}
+                    >
+                      Export Questions
                     </Button>
                   </div>
                 </CardContent>
