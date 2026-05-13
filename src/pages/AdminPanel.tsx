@@ -130,6 +130,20 @@ const AdminPanel = () => {
       reader.readAsDataURL(blob);
     });
   };
+
+  const handleExportQuiz = async (quizId: string) => {
+    try {
+      const res = await api.get(`/quiz/get-quiz/${quizId}`);
+
+      const fullQuiz = res.data.quiz;
+
+      exportQuizPDF(fullQuiz);
+    } catch (error) {
+      console.log(error);
+
+      toast.error("Failed to fetch quiz");
+    }
+  };
   // Quiz PDF export
   const exportQuizPDF = async (quiz: any) => {
     try {
@@ -526,7 +540,7 @@ const AdminPanel = () => {
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => exportQuizPDF(quiz)}
+                      onClick={() => handleExportQuiz(quiz._id)}
                     >
                       Export Questions
                     </Button>
