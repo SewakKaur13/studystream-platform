@@ -137,9 +137,7 @@ const AdminPanel = () => {
     try {
       const res = await api.get(`/quiz/get-quiz/${quizId}`);
 
-      console.log("API Response:", res.data);
-
-      // adjust according to backend response
+      // Adjust according to backend response
       const fullQuiz = res.data.quiz || res.data;
 
       if (!fullQuiz) {
@@ -207,19 +205,75 @@ const AdminPanel = () => {
         }
 
         // ================= QUESTION =================
+        const rawText = question.text || question.questionText || "";
+
+        // Split rows
+        const rows = rawText.split(";");
+
+        // Table rows
+        const tableRows = rows.filter((r: string) => r.includes("|"));
+
+        // Normal rows
+        const normalText = rows.filter((r: string) => !r.includes("|"));
+
+        // ================= NORMAL TEXT =================
         pdf.setFont("helvetica", "bold");
 
         pdf.setFontSize(14);
 
-        const questionText = `${qIndex + 1}. ${
-          question.text || question.questionText || ""
-        }`;
+        const fullQuestionText = `${qIndex + 1}. ${normalText.join(" ")}`;
 
-        const questionLines = pdf.splitTextToSize(questionText, 180);
+        const questionLines = pdf.splitTextToSize(fullQuestionText, 180);
 
         pdf.text(questionLines, 15, y);
 
-        y += questionLines.length * 7 + 4;
+        y += questionLines.length * 7 + 5;
+
+        // ================= TABLE =================
+        if (tableRows.length > 0) {
+          const startX = 15;
+
+          const rowHeight = 10;
+
+          const maxCols = Math.max(
+            ...tableRows.map((row: string) => row.split("|").length),
+          );
+
+          const tableWidth = 180;
+
+          const colWidth = tableWidth / maxCols;
+
+          tableRows.forEach((row: string, rowIndex: number) => {
+            const cols = row.split("|").map((c) => c.trim());
+
+            // Page break
+            if (y > 250) {
+              pdf.addPage();
+
+              y = 20;
+            }
+
+            cols.forEach((colText: string, colIndex: number) => {
+              const x = startX + colIndex * colWidth;
+
+              // Draw border
+              pdf.rect(x, y, colWidth, rowHeight);
+
+              // Header bold
+              pdf.setFont("helvetica", rowIndex === 0 ? "bold" : "normal");
+
+              pdf.setFontSize(8);
+
+              const splitText = pdf.splitTextToSize(colText, colWidth - 2);
+
+              pdf.text(splitText, x + 2, y + 5);
+            });
+
+            y += rowHeight;
+          });
+
+          y += 6;
+        }
 
         // ================= IMAGE =================
         if (question.questionImage) {
