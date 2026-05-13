@@ -115,6 +115,7 @@ const AdminPanel = () => {
     doc.save(fileName);
   };
 
+  // ================= IMAGE TO BASE64 =================
   const toDataURL = async (url: string): Promise<string> => {
     const response = await fetch(url);
 
@@ -131,11 +132,20 @@ const AdminPanel = () => {
     });
   };
 
+  // ================= FETCH QUIZ & EXPORT =================
   const handleExportQuiz = async (quizId: string) => {
     try {
       const res = await api.get(`/quiz/get-quiz/${quizId}`);
 
-      const fullQuiz = res.data.quiz;
+      console.log("API Response:", res.data);
+
+      // adjust according to backend response
+      const fullQuiz = res.data.quiz || res.data;
+
+      if (!fullQuiz) {
+        toast.error("Quiz not found");
+        return;
+      }
 
       exportQuizPDF(fullQuiz);
     } catch (error) {
@@ -144,9 +154,15 @@ const AdminPanel = () => {
       toast.error("Failed to fetch quiz");
     }
   };
-  // Quiz PDF export
+
+  // ================= EXPORT PDF =================
   const exportQuizPDF = async (quiz: any) => {
     try {
+      if (!quiz || !quiz.questions) {
+        toast.error("Quiz data missing");
+        return;
+      }
+
       const pdf = new jsPDF("p", "mm", "a4");
 
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -155,6 +171,7 @@ const AdminPanel = () => {
 
       // ================= TITLE =================
       pdf.setFont("helvetica", "bold");
+
       pdf.setFontSize(22);
 
       pdf.text(quiz.title || "Quiz", pageWidth / 2, y, {
@@ -165,6 +182,7 @@ const AdminPanel = () => {
 
       // ================= DESCRIPTION =================
       pdf.setFont("helvetica", "bold");
+
       pdf.setFontSize(12);
 
       const descriptionLines = pdf.splitTextToSize(quiz.description || "", 170);
@@ -176,20 +194,26 @@ const AdminPanel = () => {
       y += descriptionLines.length * 6 + 10;
 
       // ================= QUESTIONS =================
-      for (let qIndex = 0; qIndex < quiz.questions.length; qIndex++) {
-        const question = quiz.questions[qIndex];
+      for (let qIndex = 0; qIndex < (quiz?.questions?.length || 0); qIndex++) {
+        const question = quiz?.questions?.[qIndex];
 
-        // New page if needed
+        if (!question) continue;
+
+        // ================= PAGE BREAK =================
         if (y > 240) {
           pdf.addPage();
+
           y = 20;
         }
 
         // ================= QUESTION =================
         pdf.setFont("helvetica", "bold");
+
         pdf.setFontSize(14);
 
-        const questionText = `${qIndex + 1}. ${question.text || ""}`;
+        const questionText = `${qIndex + 1}. ${
+          question.text || question.questionText || ""
+        }`;
 
         const questionLines = pdf.splitTextToSize(questionText, 180);
 
@@ -208,14 +232,15 @@ const AdminPanel = () => {
 
             y += 58;
           } catch (error) {
-            console.log("Image load failed", error);
+            console.log("Image load failed:", error);
           }
         }
 
         // ================= OPTIONS =================
-        question.options.forEach((option: string, index: number) => {
+        (question.options || []).forEach((option: string, index: number) => {
           if (y > 260) {
             pdf.addPage();
+
             y = 20;
           }
 
@@ -234,13 +259,16 @@ const AdminPanel = () => {
           y += optionLines.length * 6 + 2;
         });
 
-        y += 8;
+        y += 10;
       }
 
-      // ================= SAVE =================
-      pdf.save(`${quiz.title}.pdf`);
+      // ================= SAVE PDF =================
+      pdf.save(`${quiz.title || "quiz"}.pdf`);
+
+      toast.success("PDF exported successfully");
     } catch (error) {
       console.log(error);
+
       toast.error("Failed to export PDF");
     }
   };
