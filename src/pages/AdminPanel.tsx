@@ -233,21 +233,34 @@ const AdminPanel = () => {
         if (tableRows.length > 0) {
           const startX = 15;
 
-          const rowHeight = 10;
+          const tableWidth = 180;
 
           const maxCols = Math.max(
             ...tableRows.map((row: string) => row.split("|").length),
           );
-
-          const tableWidth = 180;
 
           const colWidth = tableWidth / maxCols;
 
           tableRows.forEach((row: string, rowIndex: number) => {
             const cols = row.split("|").map((c) => c.trim());
 
-            // Page break
-            if (y > 250) {
+            // ================= DYNAMIC ROW HEIGHT =================
+            let maxHeight = 10;
+
+            const splitCols = cols.map((colText: string) => {
+              const splitText = pdf.splitTextToSize(colText, colWidth - 4);
+
+              const height = splitText.length * 5 + 4;
+
+              if (height > maxHeight) {
+                maxHeight = height;
+              }
+
+              return splitText;
+            });
+
+            // ================= PAGE BREAK =================
+            if (y + maxHeight > 270) {
               pdf.addPage();
 
               y = 20;
@@ -256,23 +269,34 @@ const AdminPanel = () => {
             cols.forEach((colText: string, colIndex: number) => {
               const x = startX + colIndex * colWidth;
 
-              // Draw border
-              pdf.rect(x, y, colWidth, rowHeight);
+              // ================= HEADER BG =================
+              if (rowIndex === 0) {
+                pdf.setFillColor(230, 230, 230);
 
-              // Header bold
+                pdf.rect(x, y, colWidth, maxHeight, "F");
+              }
+
+              // ================= BORDER =================
+              pdf.rect(x, y, colWidth, maxHeight);
+
+              // ================= FONT =================
               pdf.setFont("helvetica", rowIndex === 0 ? "bold" : "normal");
 
-              pdf.setFontSize(8);
+              pdf.setFontSize(9);
 
-              const splitText = pdf.splitTextToSize(colText, colWidth - 2);
+              // ================= TEXT =================
+              const splitText = splitCols[colIndex];
 
-              pdf.text(splitText, x + 2, y + 5);
+              pdf.text(splitText, x + 2, y + 6, {
+                maxWidth: colWidth - 4,
+                align: "center",
+              });
             });
 
-            y += rowHeight;
+            y += maxHeight;
           });
 
-          y += 6;
+          y += 8;
         }
 
         // ================= IMAGE =================
