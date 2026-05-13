@@ -115,6 +115,11 @@ const AdminPanel = () => {
     doc.save(fileName);
   };
 
+  // ================= SANITIZE TEXT =================
+  const sanitizeText = (text: string) => {
+    return text.replace(/₹/g, "Rs.").replace(/\s+/g, " ").trim();
+  };
+
   // ================= IMAGE TO BASE64 =================
   const toDataURL = async (url: string): Promise<string> => {
     const response = await fetch(url);
@@ -145,7 +150,7 @@ const AdminPanel = () => {
         return;
       }
 
-      exportQuizPDF(fullQuiz);
+      await exportQuizPDF(fullQuiz);
     } catch (error) {
       console.log(error);
 
@@ -158,6 +163,7 @@ const AdminPanel = () => {
     try {
       if (!quiz || !quiz.questions) {
         toast.error("Quiz data missing");
+
         return;
       }
 
@@ -168,22 +174,25 @@ const AdminPanel = () => {
       let y = 20;
 
       // ================= TITLE =================
-      pdf.setFont("helvetica", "bold");
+      pdf.setFont("times", "bold");
 
       pdf.setFontSize(22);
 
-      pdf.text(quiz.title || "Quiz", pageWidth / 2, y, {
+      pdf.text(sanitizeText(quiz.title || "Quiz"), pageWidth / 2, y, {
         align: "center",
       });
 
       y += 12;
 
       // ================= DESCRIPTION =================
-      pdf.setFont("helvetica", "bold");
+      pdf.setFont("times", "bold");
 
       pdf.setFontSize(12);
 
-      const descriptionLines = pdf.splitTextToSize(quiz.description || "", 170);
+      const descriptionLines = pdf.splitTextToSize(
+        sanitizeText(quiz.description || ""),
+        170,
+      );
 
       pdf.text(descriptionLines, pageWidth / 2, y, {
         align: "center",
@@ -204,8 +213,10 @@ const AdminPanel = () => {
           y = 20;
         }
 
-        // ================= QUESTION =================
-        const rawText = question.text || question.questionText || "";
+        // ================= QUESTION TEXT =================
+        const rawText = sanitizeText(
+          question.text || question.questionText || "",
+        );
 
         // Split rows
         const rows = rawText.split(";");
@@ -216,8 +227,8 @@ const AdminPanel = () => {
         // Normal rows
         const normalText = rows.filter((r: string) => !r.includes("|"));
 
-        // ================= NORMAL TEXT =================
-        pdf.setFont("helvetica", "bold");
+        // ================= NORMAL QUESTION =================
+        pdf.setFont("times", "bold");
 
         pdf.setFontSize(14);
 
@@ -233,21 +244,34 @@ const AdminPanel = () => {
         if (tableRows.length > 0) {
           const startX = 15;
 
-          const rowHeight = 10;
+          const tableWidth = 180;
 
           const maxCols = Math.max(
             ...tableRows.map((row: string) => row.split("|").length),
           );
 
-          const tableWidth = 180;
-
           const colWidth = tableWidth / maxCols;
 
           tableRows.forEach((row: string, rowIndex: number) => {
-            const cols = row.split("|").map((c) => c.trim());
+            const cols = row.split("|").map((c) => sanitizeText(c.trim()));
+
+            // Dynamic row height
+            let maxHeight = 10;
+
+            const splitCols = cols.map((colText: string) => {
+              const splitText = pdf.splitTextToSize(colText, colWidth - 4);
+
+              const height = splitText.length * 5 + 4;
+
+              if (height > maxHeight) {
+                maxHeight = height;
+              }
+
+              return splitText;
+            });
 
             // Page break
-            if (y > 250) {
+            if (y + maxHeight > 270) {
               pdf.addPage();
 
               y = 20;
@@ -256,23 +280,34 @@ const AdminPanel = () => {
             cols.forEach((colText: string, colIndex: number) => {
               const x = startX + colIndex * colWidth;
 
-              // Draw border
-              pdf.rect(x, y, colWidth, rowHeight);
+              // Header bg
+              if (rowIndex === 0) {
+                pdf.setFillColor(230, 230, 230);
 
-              // Header bold
-              pdf.setFont("helvetica", rowIndex === 0 ? "bold" : "normal");
+                pdf.rect(x, y, colWidth, maxHeight, "F");
+              }
 
-              pdf.setFontSize(8);
+              // Border
+              pdf.rect(x, y, colWidth, maxHeight);
 
-              const splitText = pdf.splitTextToSize(colText, colWidth - 2);
+              // Font
+              pdf.setFont("times", rowIndex === 0 ? "bold" : "normal");
 
-              pdf.text(splitText, x + 2, y + 5);
+              pdf.setFontSize(9);
+
+              // Text
+              const splitText = splitCols[colIndex];
+
+              pdf.text(splitText, x + 2, y + 6, {
+                maxWidth: colWidth - 4,
+                align: "center",
+              });
             });
 
-            y += rowHeight;
+            y += maxHeight;
           });
 
-          y += 6;
+          y += 8;
         }
 
         // ================= IMAGE =================
@@ -300,11 +335,13 @@ const AdminPanel = () => {
 
           const isCorrect = index === question.correctAnswer;
 
-          pdf.setFont("helvetica", isCorrect ? "bold" : "normal");
+          pdf.setFont("times", isCorrect ? "bold" : "normal");
 
           pdf.setFontSize(12);
 
-          const optionText = `${String.fromCharCode(65 + index)}. ${option}`;
+          const optionText = `${String.fromCharCode(
+            65 + index,
+          )}. ${sanitizeText(option)}`;
 
           const optionLines = pdf.splitTextToSize(optionText, 170);
 
@@ -317,7 +354,7 @@ const AdminPanel = () => {
       }
 
       // ================= SAVE PDF =================
-      pdf.save(`${quiz.title || "quiz"}.pdf`);
+      pdf.save(`${sanitizeText(quiz.title || "quiz")}.pdf`);
 
       toast.success("PDF exported successfully");
     } catch (error) {
@@ -326,7 +363,7 @@ const AdminPanel = () => {
       toast.error("Failed to export PDF");
     }
   };
-
+  
   //api call of dashboard stats
   const fetchDashboard = async () => {
     try {
