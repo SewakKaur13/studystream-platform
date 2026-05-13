@@ -9,6 +9,17 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import api from "@/api/axios";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const QuizPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -65,7 +76,6 @@ const QuizPage = () => {
           createdAt: new Date().toISOString(),
           status: "active",
         });
-
 
         // FIXED TIMER
         setTimeLeft((data.duration || 15) * 60);
@@ -284,7 +294,7 @@ const QuizPage = () => {
   /** Current question */
   const q = quiz.questions[currentQ];
   console.log("FULL QUIZ DATA:", quiz);
-console.log("CURRENT QUESTION:", q);
+  console.log("CURRENT QUESTION:", q);
 
   /** Format timer */
   const formatTime = (s: number) => {
@@ -474,7 +484,7 @@ console.log("CURRENT QUESTION:", q);
             ))}
           </CardContent>
         </Card>
-            
+
         {/* Navigation */}
         <div className="mt-6 flex items-center justify-between">
           <Button
@@ -489,13 +499,35 @@ console.log("CURRENT QUESTION:", q);
               Next <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           ) : (
-            <Button
-              className="gradient-hero text-primary-foreground"
-              onClick={() => submitQuiz(false)}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Submitting..." : "Submit Quiz"}
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  className="gradient-hero text-primary-foreground"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Submitting..." : "Submit Quiz"}
+                </Button>
+              </AlertDialogTrigger>
+
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Submit Quiz?</AlertDialogTitle>
+
+                  <AlertDialogDescription>
+                    Are you sure you want to submit the quiz? After submission
+                    you cannot change your answers.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+
+                  <AlertDialogAction onClick={() => submitQuiz(false)}>
+                    Yes, Submit
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </div>
