@@ -829,124 +829,559 @@ const getResultPDFData = async (req, res) => {
   }
 };
 
+
 const downloadQuizResultPDF = async (req, res) => {
   try {
     const { attemptId } = req.params;
-    const studentId = req.userId;
 
     const attempt = await Attempt.findOne({
       _id: attemptId,
-      studentId,
-      status: "completed",
-    });
+      studentId: req.user._id,
+    })
+      .populate("quizId")
+      .lean();
 
     if (!attempt) {
       return res.status(404).json({
-        message: "Completed attempt not found",
+        message: "Attempt not found",
       });
     }
 
-    const quiz = await Quiz.findById(attempt.quizId);
+    const quiz = attempt.quizId;
 
-    if (!quiz) {
-      return res.status(404).json({
-        message: "Quiz not found",
-      });
-    }
-
-    const totalMarks =
-      quiz.questions.length * quiz.marksPerQuestion;
-
-    const obtainedMarks = attempt.score || 0;
-
-    const percentage = totalMarks
-      ? ((obtainedMarks / totalMarks) * 100).toFixed(2)
-      : "0.00";
+    const doc = new PDFDocument({
+      size: "A4",
+      margin: 45,
+      bufferPages: true,
+      info: {
+        Title: `${quiz.title || "Quiz"} Result`,
+        Author: "Study Stream",
+      },
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="Quiz_Result_${attemptId}.pdf"`,
+      `attachment; filename="${(quiz.title || "quiz")
+        .replace(/[^a-z0-9]/gi, "_")
+        .toLowerCase()}-result.pdf"`
     );
-
-    const doc = new PDFDocument({
-      margin: 40,
-      size: "A4",
-    });
 
     doc.pipe(res);
 
-    doc.fontSize(20).text("Quiz Result", {
-      align: "center",
-    });
+    const pageWidth = doc.page.width;
+    const pageHeight = doc.page.height;
+    const contentWidth =
+      pageWidth - doc.page.margins.left - doc.page.margins.right;
 
-    doc.moveDown();
+    const colors = {
+      dark: "#1F2937",
+      gray: "#6B7280",
+      border: "#D1D5DB",
+      lightGray: "#F3F4F6",
+      green: "#DCFCE7",
+      greenBorder: "#86EFAC",
+      red: "#FEE2E2",
+      redBorder: "#FCA5A5",
+      blue: "#DBEAFE",
+      blueBorder: "#93C5FD",
+      white: "#FFFFFF",
+    };
 
-    doc.fontSize(14).text(`Quiz: ${quiz.title || "Quiz"}`);
-    doc.text(`Score: ${obtainedMarks}/${totalMarks}`);
-    doc.text(`Correct: ${attempt.correctCount || 0}`);
-    doc.text(`Wrong: ${attempt.wrongCount || 0}`);
-    doc.text(`Percentage: ${percentage}%`);
-    doc.text(
-      `Completed At: ${
-        attempt.submittedAt
-          ? new Date(attempt.submittedAt).toLocaleString()
-          : "N/A"
-      }`,
-    );
+    const safeText = (value) => {
+      if (value === null || value === undefined) return "";
+      return String(value);
+    };
 
-    doc.moveDown();
-    doc.fontSize(16).text("Question Review");
-    doc.moveDown();
+    const isCode = (text) => {
+      const value = safeText(text);
 
-    quiz.questions.forEach((question, index) => {
-      const answer = attempt.answers.find(
-        (item) =>
-          item.questionId.toString() === question._id.toString(),
+      return (
+        value.includes("```") ||
+        value.includes("=>") ||
+        value.includes("const ") ||
+        value.includes("let ") ||
+        value.includes("var ") ||
+        value.includes("function ") ||
+        value.includes("import ") ||
+        value.includes("export ") ||
+        value.includes("SELECT ") ||
+        value.includes("<?php") ||
+        value.includes("<div") ||
+        value.includes("</") ||
+        value.includes("{") ||
+        value.includes("}") ||
+        value.includes("console.log")
       );
+    };
 
-      const selectedOption = answer
-        ? Number(answer.selectedOption)
-        : -1;
+    const cleanCode = (text) => {
+      return safeText(text)
+        .replace(/^```[a-zA-Z0-9]*\s*/, "")
+        .replace(/```$/g, "")
+        .trim();
+    };
 
-      const correctAnswer = Number(question.correctAnswer);
+    const drawHeader = () => {
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(20)
+        .fillColor(colors.dark)
+        .text(quiz.title || "Quiz Result", {
+          align: "center",
+          width: contentWidth,
+        });
 
-      const selectedText =
-        selectedOption >= 0 &&
-        selectedOption < question.options.length
-          ? question.options[selectedOption]
-          : "Not answered";
-
-      const correctText =
-        correctAnswer >= 0 &&
-        correctAnswer < question.options.length
-          ? question.options[correctAnswer]
-          : "Not available";
+      doc.moveDown(0.4);
 
       doc
-        .fontSize(11)
-        .text(`${index + 1}. ${question.questionText || ""}`);
+        .font("Helvetica")
+        .fontSize(10)
+        .fillColor(colors.gray)
+        .text(`Student: ${req.user.name || "Student"}`, {
+          align: "center",
+          width: contentWidth,
+        });
 
-      doc.text(`Your answer: ${selectedText}`);
-      doc.text(`Correct answer: ${correctText}`);
-      doc.text(
-        selectedOption === correctAnswer ? "Result: Correct" : "Result: Wrong",
+      doc
+        .fontSize(10)
+        .text(`Submitted: ${new Date(attempt.submittedAt).toLocaleString()}`, {
+          align: "center",
+          width: contentWidth,
+        });
+
+      doc.moveDown(0.8);
+
+      doc
+        .moveTo(doc.page.margins.left, doc.y)
+        .lineTo(pageWidth - doc.page.margins.right, doc.y)
+        .strokeColor(colors.border)
+        .stroke();
+
+      doc.moveDown(0.8);
+    };
+
+    const ensureSpace = (height = 40) => {
+      if (doc.y + height > pageHeight - doc.page.margins.bottom) {
+        doc.addPage();
+        doc.y = doc.page.margins.top;
+      }
+    };
+
+    const drawStatusBadge = (label, background, border) => {
+      const badgeWidth = doc.widthOfString(label) + 18;
+      const badgeHeight = 19;
+
+      ensureSpace(badgeHeight + 8);
+
+      const x = pageWidth - doc.page.margins.right - badgeWidth;
+
+      doc
+        .roundedRect(x, doc.y - 3, badgeWidth, badgeHeight, 5)
+        .fillAndStroke(background, border);
+
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(8)
+        .fillColor(colors.dark)
+        .text(label, x + 9, doc.y + 2, {
+          width: badgeWidth - 18,
+          align: "center",
+        });
+    };
+
+    const drawCodeBlock = (code) => {
+      const value = cleanCode(code);
+      const lines = value.split("\n");
+
+      const lineHeight = 11;
+      const padding = 9;
+      const blockHeight = lines.length * lineHeight + padding * 2;
+
+      ensureSpace(Math.min(blockHeight, 100));
+
+      doc
+        .roundedRect(
+          doc.page.margins.left,
+          doc.y,
+          contentWidth,
+          blockHeight,
+          5
+        )
+        .fillAndStroke("#F9FAFB", colors.border);
+
+      doc
+        .font("Courier")
+        .fontSize(8.5)
+        .fillColor(colors.dark)
+        .text(value, doc.page.margins.left + padding, doc.y + padding, {
+          width: contentWidth - padding * 2,
+          lineGap: 2,
+        });
+
+      doc.y += blockHeight + 8;
+    };
+
+    const drawTable = (text) => {
+      const rows = safeText(text)
+        .split("\n")
+        .map((row) => row.split(";").map((cell) => cell.trim()))
+        .filter((row) => row.some((cell) => cell.length > 0));
+
+      if (!rows.length) return;
+
+      const columnCount = Math.max(...rows.map((row) => row.length));
+      const columnWidth = contentWidth / columnCount;
+      const cellPadding = 5;
+      const fontSize = 8.5;
+
+      rows.forEach((row, rowIndex) => {
+        const normalizedRow = [...row];
+
+        while (normalizedRow.length < columnCount) {
+          normalizedRow.push("");
+        }
+
+        const rowHeights = normalizedRow.map((cell) => {
+          return doc.heightOfString(cell, {
+            width: columnWidth - cellPadding * 2,
+            font: "Helvetica",
+            fontSize,
+            lineGap: 2,
+          });
+        });
+
+        const rowHeight =
+          Math.max(...rowHeights, 12) + cellPadding * 2;
+
+        ensureSpace(rowHeight + 3);
+
+        const rowY = doc.y;
+
+        normalizedRow.forEach((cell, columnIndex) => {
+          const cellX =
+            doc.page.margins.left + columnIndex * columnWidth;
+
+          const isHeader = rowIndex === 0;
+
+          doc
+            .rect(cellX, rowY, columnWidth, rowHeight)
+            .fillAndStroke(
+              isHeader ? colors.lightGray : colors.white,
+              colors.border
+            );
+
+          doc
+            .font(isHeader ? "Helvetica-Bold" : "Helvetica")
+            .fontSize(fontSize)
+            .fillColor(colors.dark)
+            .text(cell, cellX + cellPadding, rowY + cellPadding, {
+              width: columnWidth - cellPadding * 2,
+              lineGap: 2,
+            });
+        });
+
+        doc.y = rowY + rowHeight;
+      });
+
+      doc.moveDown(0.5);
+    };
+
+    const drawRichText = (text) => {
+      const value = safeText(text);
+
+      if (!value.trim()) return;
+
+      if (isCode(value)) {
+        drawCodeBlock(value);
+        return;
+      }
+
+      if (value.includes(";")) {
+        drawTable(value);
+        return;
+      }
+
+      ensureSpace(25);
+
+      doc
+        .font("Helvetica")
+        .fontSize(9.5)
+        .fillColor(colors.dark)
+        .text(value, {
+          width: contentWidth,
+          lineGap: 3,
+        });
+
+      doc.moveDown(0.35);
+    };
+
+    const getAnswerIndex = (answer) => {
+      if (answer === null || answer === undefined) return null;
+
+      if (typeof answer === "number") return answer;
+
+      if (typeof answer === "object") {
+        if (typeof answer.selectedOption === "number") {
+          return answer.selectedOption;
+        }
+
+        if (typeof answer.optionIndex === "number") {
+          return answer.optionIndex;
+        }
+
+        if (typeof answer.answer === "number") {
+          return answer.answer;
+        }
+      }
+
+      return null;
+    };
+
+    const getCorrectIndex = (question) => {
+      if (typeof question.correctAnswer === "number") {
+        return question.correctAnswer;
+      }
+
+      if (typeof question.correctOption === "number") {
+        return question.correctOption;
+      }
+
+      if (typeof question.answer === "number") {
+        return question.answer;
+      }
+
+      return null;
+    };
+
+    const getSelectedAnswer = (question) => {
+      const savedAnswer = (attempt.answers || []).find((answer) => {
+        const questionId =
+          answer.questionId?._id ||
+          answer.questionId ||
+          answer.question;
+
+        return String(questionId) === String(question._id);
+      });
+
+      return getAnswerIndex(savedAnswer);
+    };
+
+    drawHeader();
+
+    const totalQuestions = quiz.questions?.length || 0;
+    const answeredQuestions = (attempt.answers || []).filter(
+      (answer) => getAnswerIndex(answer) !== null
+    ).length;
+
+    const correctQuestions = quiz.questions?.filter((question) => {
+      const selected = getSelectedAnswer(question);
+      const correct = getCorrectIndex(question);
+
+      return selected !== null && correct !== null && selected === correct;
+    }).length || 0;
+
+    const score = attempt.score ?? correctQuestions;
+
+    ensureSpace(75);
+
+    doc
+      .roundedRect(
+        doc.page.margins.left,
+        doc.y,
+        contentWidth,
+        65,
+        8
+      )
+      .fillAndStroke("#F9FAFB", colors.border);
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(12)
+      .fillColor(colors.dark)
+      .text("Result Summary", doc.page.margins.left + 12, doc.y + 10);
+
+    doc
+      .font("Helvetica")
+      .fontSize(10)
+      .text(
+        `Score: ${score} / ${totalQuestions}`,
+        doc.page.margins.left + 12,
+        doc.y + 29
       );
 
-      doc.moveDown();
+    doc.text(
+      `Attempted: ${answeredQuestions} / ${totalQuestions}`,
+      doc.page.margins.left + 190,
+      doc.y - 12
+    );
 
-      if (doc.y > 730) {
-        doc.addPage();
+    doc.text(
+      `Correct: ${correctQuestions}`,
+      doc.page.margins.left + 365,
+      doc.y - 12
+    );
+
+    doc.y += 82;
+
+    quiz.questions.forEach((question, questionIndex) => {
+      const options = question.options || [];
+      const selectedIndex = getSelectedAnswer(question);
+      const correctIndex = getCorrectIndex(question);
+      const attempted = selectedIndex !== null;
+
+      ensureSpace(90);
+
+      doc
+        .roundedRect(
+          doc.page.margins.left,
+          doc.y,
+          contentWidth,
+          30,
+          5
+        )
+        .fillAndStroke(colors.lightGray, colors.border);
+
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(10.5)
+        .fillColor(colors.dark)
+        .text(
+          `Question ${questionIndex + 1}`,
+          doc.page.margins.left + 10,
+          doc.y + 9
+        );
+
+      drawStatusBadge(
+        attempted ? "Attempted" : "Not Attempted",
+        attempted ? colors.blue : colors.lightGray,
+        attempted ? colors.blueBorder : colors.border
+      );
+
+      doc.y += 39;
+
+      drawRichText(question.question || question.text || "");
+
+      options.forEach((option, optionIndex) => {
+        const optionText =
+          typeof option === "string"
+            ? option
+            : option.text || option.label || option.value || "";
+
+        const isSelected = selectedIndex === optionIndex;
+        const isCorrect = correctIndex === optionIndex;
+        const isWrongSelected = isSelected && !isCorrect;
+
+        let background = colors.white;
+        let border = colors.border;
+
+        if (isCorrect) {
+          background = colors.green;
+          border = colors.greenBorder;
+        }
+
+        if (isWrongSelected) {
+          background = colors.red;
+          border = colors.redBorder;
+        }
+
+        const prefix = `${String.fromCharCode(65 + optionIndex)}. `;
+        const displayText = `${prefix}${optionText}`;
+
+        const textHeight = doc.heightOfString(displayText, {
+          width: contentWidth - 45,
+          font: "Helvetica",
+          fontSize: 9.5,
+          lineGap: 2,
+        });
+
+        const optionHeight = Math.max(27, textHeight + 14);
+
+        ensureSpace(optionHeight + 5);
+
+        const optionY = doc.y;
+
+        doc
+          .roundedRect(
+            doc.page.margins.left,
+            optionY,
+            contentWidth,
+            optionHeight,
+            5
+          )
+          .fillAndStroke(background, border);
+
+        doc
+          .font(isCorrect || isSelected ? "Helvetica-Bold" : "Helvetica")
+          .fontSize(9.5)
+          .fillColor(colors.dark)
+          .text(displayText, doc.page.margins.left + 10, optionY + 7, {
+            width: contentWidth - 45,
+            lineGap: 2,
+          });
+
+        if (isCorrect) {
+          doc
+            .font("Helvetica-Bold")
+            .fontSize(8)
+            .fillColor("#166534")
+            .text("✓ Correct", pageWidth - 105, optionY + 8);
+        }
+
+        if (isWrongSelected) {
+          doc
+            .font("Helvetica-Bold")
+            .fontSize(8)
+            .fillColor("#991B1B")
+            .text("✗ Wrong", pageWidth - 105, optionY + 8);
+        }
+
+        doc.y = optionY + optionHeight + 5;
+      });
+
+      if (!attempted) {
+        doc
+          .font("Helvetica-Oblique")
+          .fontSize(9)
+          .fillColor(colors.gray)
+          .text("Not Attempted", {
+            width: contentWidth,
+          });
+
+        doc.moveDown(0.4);
       }
+
+      doc.moveDown(0.7);
     });
+
+    const range = doc.bufferedPageRange();
+
+    for (let pageIndex = 0; pageIndex < range.count; pageIndex++) {
+      doc.switchToPage(range.start + pageIndex);
+
+      doc
+        .font("Helvetica")
+        .fontSize(8)
+        .fillColor(colors.gray)
+        .text(
+          `Page ${pageIndex + 1} of ${range.count}`,
+          doc.page.margins.left,
+          pageHeight - 28,
+          {
+            width: contentWidth,
+            align: "center",
+          }
+        );
+    }
 
     doc.end();
   } catch (error) {
-    console.error("PDF generation error:", error);
+    console.error("PDF export error:", error);
 
     if (!res.headersSent) {
-      res.status(500).json({
-        message: error.message,
+      return res.status(500).json({
+        message: "Unable to export quiz result PDF",
+        error: error.message,
       });
     }
   }

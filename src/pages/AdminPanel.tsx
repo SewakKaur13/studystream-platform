@@ -160,338 +160,461 @@ const AdminPanel = () => {
 
   // ================= EXPORT PDF =================
   const exportQuizPDF = async (quiz: any) => {
-  try {
-    if (!quiz || !quiz.questions) {
-      toast.error("Quiz data missing");
-      return;
-    }
-
-    const pdf = new jsPDF("p", "mm", "a4");
-
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-
-    let y = 20;
-
-    // ================= HELPER: PAGE BREAK =================
-    const addPageIfNeeded = (requiredHeight = 10) => {
-      if (y + requiredHeight > pageHeight - 20) {
-        pdf.addPage();
-        y = 20;
-      }
-    };
-
-    // ================= TITLE =================
-    pdf.setFont("times", "bold");
-    pdf.setFontSize(22);
-
-    pdf.text(
-      sanitizeText(quiz.title || "Quiz"),
-      pageWidth / 2,
-      y,
-      {
-        align: "center",
-      },
-    );
-
-    y += 12;
-
-    // ================= DESCRIPTION =================
-    pdf.setFont("times", "bold");
-    pdf.setFontSize(12);
-
-    const descriptionLines = pdf.splitTextToSize(
-      sanitizeText(quiz.description || ""),
-      170,
-    );
-
-    pdf.text(descriptionLines, pageWidth / 2, y, {
-      align: "center",
-    });
-
-    y += descriptionLines.length * 6 + 10;
-
-    // ================= QUESTIONS =================
-    for (
-      let qIndex = 0;
-      qIndex < (quiz?.questions?.length || 0);
-      qIndex++
-    ) {
-      const question = quiz?.questions?.[qIndex];
-
-      if (!question) continue;
-
-      // ================= PAGE BREAK BEFORE QUESTION =================
-      addPageIfNeeded(20);
-
-      // ================= QUESTION TEXT =================
-      const rawText = sanitizeText(
-        question.text || question.questionText || "",
-      );
-
-      // Split rows
-      const rows = rawText.split(";");
-
-      // Table rows
-      const tableRows = rows.filter((row: string) =>
-        row.includes("|"),
-      );
-
-      // Normal rows
-      const normalText = rows.filter(
-        (row: string) => !row.includes("|"),
-      );
-
-      // ================= NORMAL QUESTION =================
-      if (normalText.join(" ").trim()) {
-        pdf.setFont("times", "bold");
-        pdf.setFontSize(14);
-
-        const fullQuestionText = `${qIndex + 1}. ${normalText.join(
-          " ",
-        )}`;
-
-        const questionLines = pdf.splitTextToSize(
-          fullQuestionText,
-          180,
-        );
-
-        addPageIfNeeded(questionLines.length * 7 + 5);
-
-        pdf.text(questionLines, 15, y);
-
-        y += questionLines.length * 7 + 5;
-      } else {
-        // If there is no normal text, still show the question number
-        pdf.setFont("times", "bold");
-        pdf.setFontSize(14);
-
-        const questionNumber = `${qIndex + 1}.`;
-
-        addPageIfNeeded(12);
-
-        pdf.text(questionNumber, 15, y);
-
-        y += 10;
+    try {
+      if (!quiz || !quiz.questions) {
+        toast.error("Quiz data missing");
+        return;
       }
 
-      // ================= CODE =================
-      if (question.questionCode?.trim()) {
-        addPageIfNeeded(25);
+      const pdf = new jsPDF("p", "mm", "a4");
 
-        const codeLanguage = question.codeLanguage || "text";
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
 
-        pdf.setFont("times", "bold");
-        pdf.setFontSize(10);
+      const marginLeft = 15;
+      const marginRight = 15;
+      const contentWidth = pageWidth - marginLeft - marginRight;
+      const bottomMargin = 18;
 
-        pdf.text(
-          `Code${codeLanguage !== "text" ? ` (${codeLanguage})` : ""}:`,
-          20,
-          y,
-        );
+      let y = 20;
 
-        y += 6;
+      const colors = {
+        black: [0, 0, 0] as [number, number, number],
+        gray: [110, 110, 110] as [number, number, number],
+        border: [190, 190, 190] as [number, number, number],
+        tableHeader: [230, 230, 230] as [number, number, number],
+        codeBackground: [245, 245, 245] as [number, number, number],
+        correctBackground: [220, 252, 231] as [number, number, number],
+        correctBorder: [134, 239, 172] as [number, number, number],
+      };
 
-        pdf.setFont("courier", "normal");
-        pdf.setFontSize(9);
+      const setTextColor = (color = colors.black) => {
+        pdf.setTextColor(...color);
+      };
 
-        const codeLines = pdf.splitTextToSize(
-          sanitizeText(question.questionCode),
-          165,
-        );
+      const setDrawColor = (color = colors.border) => {
+        pdf.setDrawColor(...color);
+      };
 
-        const codeLineHeight = 5;
-        const codeBlockHeight = codeLines.length * codeLineHeight + 6;
+      const setFillColor = (color = colors.tableHeader) => {
+        pdf.setFillColor(...color);
+      };
 
-        // Add a new page if the code block does not fit
-        if (y + codeBlockHeight > pageHeight - 20) {
+      const addPageIfNeeded = (requiredHeight = 10) => {
+        if (y + requiredHeight > pageHeight - bottomMargin) {
           pdf.addPage();
           y = 20;
         }
+      };
 
-        // Code block background
-        pdf.setFillColor(245, 245, 245);
-        pdf.rect(18, y - 4, 174, codeBlockHeight, "F");
+      const sanitize = (value: any) => {
+        if (value === null || value === undefined) return "";
+        return sanitizeText(String(value));
+      };
 
-        // Code block border
-        pdf.setDrawColor(180, 180, 180);
-        pdf.rect(18, y - 4, 174, codeBlockHeight);
+      const isCodeText = (text: string) => {
+        const value = text.trim();
 
-        pdf.setTextColor(30, 30, 30);
-        pdf.text(codeLines, 22, y);
+        return (
+          value.includes("```") ||
+          value.includes("=>") ||
+          value.includes("const ") ||
+          value.includes("let ") ||
+          value.includes("var ") ||
+          value.includes("function ") ||
+          value.includes("import ") ||
+          value.includes("export ") ||
+          value.includes("console.log") ||
+          value.includes("<div") ||
+          value.includes("</") ||
+          value.includes("{") ||
+          value.includes("}") ||
+          value.includes("SELECT ") ||
+          value.includes("public static") ||
+          value.includes("#include")
+        );
+      };
 
-        y += codeBlockHeight + 8;
+      const cleanCode = (text: string) => {
+        return text
+          .replace(/^```[a-zA-Z0-9+#-]*\s*/, "")
+          .replace(/```$/g, "")
+          .trim();
+      };
 
-        // Restore normal PDF text settings
-        pdf.setTextColor(0, 0, 0);
-        pdf.setFont("times", "normal");
-        pdf.setFontSize(12);
-      }
+      const drawCodeBlock = (codeText: string, language = "") => {
+        const code = cleanCode(codeText);
 
-      // ================= TABLE =================
-      if (tableRows.length > 0) {
-        const startX = 15;
-        const tableWidth = 180;
+        if (!code) return;
 
-        const maxCols = Math.max(
-          ...tableRows.map(
-            (row: string) => row.split("|").length,
-          ),
+        pdf.setFont("times", "bold");
+        pdf.setFontSize(10);
+        setTextColor();
+
+        const codeTitle = language ? `Code (${language})` : "Code";
+
+        addPageIfNeeded(15);
+
+        pdf.text(codeTitle, marginLeft, y);
+        y += 5;
+
+        pdf.setFont("courier", "normal");
+        pdf.setFontSize(8.5);
+
+        const codeLines = pdf.splitTextToSize(code, contentWidth - 8);
+
+        const lineHeight = 4.5;
+        const padding = 4;
+        const maxLinesPerPage = Math.floor(
+          (pageHeight - bottomMargin - 20) / lineHeight,
         );
 
-        const colWidth = tableWidth / maxCols;
+        for (
+          let start = 0;
+          start < codeLines.length;
+          start += maxLinesPerPage
+        ) {
+          const currentLines = codeLines.slice(start, start + maxLinesPerPage);
 
-        tableRows.forEach((row: string, rowIndex: number) => {
-          const cols = row
-            .split("|")
-            .map((column: string) =>
-              sanitizeText(column.trim()),
-            );
+          const blockHeight = currentLines.length * lineHeight + padding * 2;
 
-          // Calculate dynamic row height
-          let maxHeight = 10;
+          addPageIfNeeded(blockHeight + 4);
 
-          const splitCols = cols.map((columnText: string) => {
-            const splitText = pdf.splitTextToSize(
-              columnText,
-              colWidth - 4,
-            );
+          setFillColor(colors.codeBackground);
+          pdf.rect(marginLeft, y - 3, contentWidth, blockHeight, "F");
 
-            const height = splitText.length * 5 + 4;
+          setDrawColor(colors.border);
+          pdf.rect(marginLeft, y - 3, contentWidth, blockHeight);
 
-            if (height > maxHeight) {
-              maxHeight = height;
-            }
+          setTextColor([35, 35, 35]);
 
-            return splitText;
+          pdf.text(currentLines, marginLeft + padding, y + padding, {
+            maxWidth: contentWidth - padding * 2,
+            lineHeightFactor: 1.2,
           });
 
-          // Page break before table row
-          if (y + maxHeight > pageHeight - 20) {
-            pdf.addPage();
-            y = 20;
+          y += blockHeight + 5;
+        }
+
+        pdf.setFont("times", "normal");
+        pdf.setFontSize(12);
+        setTextColor();
+      };
+
+      const drawTable = (text: string) => {
+        const tableRows = text
+          .split(";")
+          .map((row) => row.trim())
+          .filter(Boolean)
+          .map((row) => row.split("|").map((cell) => sanitize(cell.trim())));
+
+        if (!tableRows.length) return;
+
+        const maxColumns = Math.max(...tableRows.map((row) => row.length));
+
+        const columnWidth = contentWidth / maxColumns;
+        const cellPadding = 2;
+        const fontSize = 8.5;
+
+        tableRows.forEach((row, rowIndex) => {
+          const normalizedRow = [...row];
+
+          while (normalizedRow.length < maxColumns) {
+            normalizedRow.push("");
           }
 
-          cols.forEach(
-            (columnText: string, colIndex: number) => {
-              const x = startX + colIndex * colWidth;
+          pdf.setFont("times", rowIndex === 0 ? "bold" : "normal");
+          pdf.setFontSize(fontSize);
 
-              // Header background
-              if (rowIndex === 0) {
-                pdf.setFillColor(230, 230, 230);
-                pdf.rect(
-                  x,
-                  y,
-                  colWidth,
-                  maxHeight,
-                  "F",
-                );
-              }
+          const splitCells = normalizedRow.map((cell) =>
+            pdf.splitTextToSize(cell, columnWidth - cellPadding * 2),
+          );
 
-              // Cell border
-              pdf.setDrawColor(0, 0, 0);
-              pdf.rect(
-                x,
-                y,
-                colWidth,
-                maxHeight,
-              );
+          const rowHeight = Math.max(
+            8,
+            ...splitCells.map(
+              (cellLines) => cellLines.length * 4 + cellPadding * 2,
+            ),
+          );
 
-              // Cell font
-              pdf.setFont(
-                "times",
-                rowIndex === 0 ? "bold" : "normal",
-              );
+          addPageIfNeeded(rowHeight + 2);
 
-              pdf.setFontSize(9);
+          normalizedRow.forEach((cell, columnIndex) => {
+            const x = marginLeft + columnIndex * columnWidth;
 
-              // Cell text
-              const splitText = splitCols[colIndex];
+            if (rowIndex === 0) {
+              setFillColor(colors.tableHeader);
+              pdf.rect(x, y, columnWidth, rowHeight, "F");
+            }
 
-              pdf.text(splitText, x + 2, y + 6, {
-                maxWidth: colWidth - 4,
+            setDrawColor(colors.border);
+            pdf.rect(x, y, columnWidth, rowHeight);
+
+            setTextColor();
+
+            pdf.text(
+              splitCells[columnIndex],
+              x + cellPadding,
+              y + cellPadding + 3,
+              {
+                maxWidth: columnWidth - cellPadding * 2,
                 align: "center",
-              });
+                lineHeightFactor: 1.15,
+              },
+            );
+          });
+
+          y += rowHeight;
+        });
+
+        y += 7;
+      };
+
+      const drawQuestionText = (questionText: string) => {
+        const rows = questionText
+          .split(";")
+          .map((row) => row.trim())
+          .filter(Boolean);
+
+        const tableRows = rows.filter((row) => row.includes("|"));
+        const normalRows = rows.filter((row) => !row.includes("|"));
+
+        if (normalRows.length > 0) {
+          pdf.setFont("times", "bold");
+          pdf.setFontSize(14);
+          setTextColor();
+
+          const normalText = normalRows.join(" ");
+          const questionLines = pdf.splitTextToSize(normalText, contentWidth);
+
+          addPageIfNeeded(questionLines.length * 7 + 5);
+
+          pdf.text(questionLines, marginLeft, y, {
+            lineHeightFactor: 1.2,
+          });
+
+          y += questionLines.length * 7 + 5;
+        }
+
+        if (tableRows.length > 0) {
+          drawTable(tableRows.join(";"));
+        }
+      };
+
+      const drawOption = (
+        option: string,
+        optionIndex: number,
+        isCorrect: boolean,
+      ) => {
+        pdf.setFont("times", "normal");
+        pdf.setFontSize(12);
+
+        const label = `${String.fromCharCode(65 + optionIndex)}.`;
+        const optionText = sanitize(option);
+
+        const optionLines = pdf.splitTextToSize(optionText, contentWidth - 18);
+
+        const lineHeight = 6;
+        const paddingX = 5;
+        const paddingY = 4;
+        const optionHeight = optionLines.length * lineHeight + paddingY * 2;
+
+        addPageIfNeeded(optionHeight + 4);
+
+        if (isCorrect) {
+          setFillColor(colors.correctBackground);
+          pdf.roundedRect(
+            marginLeft,
+            y - 3,
+            contentWidth,
+            optionHeight,
+            2,
+            2,
+            "F",
+          );
+
+          setDrawColor(colors.correctBorder);
+          pdf.roundedRect(
+            marginLeft,
+            y - 3,
+            contentWidth,
+            optionHeight,
+            2,
+            2,
+            "S",
+          );
+        }
+
+        setTextColor();
+        pdf.setFont("times", isCorrect ? "bold" : "normal");
+
+        pdf.text(label, marginLeft + paddingX, y + paddingY + 2);
+
+        pdf.text(optionLines, marginLeft + 14, y + paddingY + 2, {
+          maxWidth: contentWidth - 20,
+          lineHeightFactor: 1.2,
+        });
+
+        if (isCorrect) {
+          pdf.setFont("times", "bold");
+          pdf.setFontSize(9);
+          pdf.setTextColor(22, 101, 52);
+
+          pdf.text(
+            "✓ Correct Answer",
+            pageWidth - marginRight - 38,
+            y + paddingY + 2,
+            {
+              align: "right",
             },
           );
 
-          y += maxHeight;
+          setTextColor();
+        }
+
+        y += optionHeight + 3;
+      };
+
+      // ================= TITLE =================
+      pdf.setFont("times", "bold");
+      pdf.setFontSize(22);
+      setTextColor();
+
+      pdf.text(sanitize(quiz.title || "Quiz"), pageWidth / 2, y, {
+        align: "center",
+      });
+
+      y += 12;
+
+      // ================= DESCRIPTION =================
+      if (quiz.description?.trim()) {
+        pdf.setFont("times", "normal");
+        pdf.setFontSize(12);
+
+        const descriptionLines = pdf.splitTextToSize(
+          sanitize(quiz.description),
+          170,
+        );
+
+        pdf.text(descriptionLines, pageWidth / 2, y, {
+          align: "center",
+          lineHeightFactor: 1.2,
         });
+
+        y += descriptionLines.length * 6 + 10;
+      }
+
+      // ================= QUESTIONS =================
+      for (let qIndex = 0; qIndex < quiz.questions.length; qIndex++) {
+        const question = quiz.questions[qIndex];
+
+        if (!question) continue;
+
+        addPageIfNeeded(25);
+
+        // Question number
+        pdf.setFont("times", "bold");
+        pdf.setFontSize(14);
+        setTextColor();
+
+        pdf.text(`${qIndex + 1}.`, marginLeft, y);
+
+        y += 7;
+
+        // Question text
+        const rawQuestionText = sanitize(
+          question.text || question.questionText || question.question || "",
+        );
+
+        if (rawQuestionText.trim()) {
+          drawQuestionText(rawQuestionText);
+        }
+
+        // Code
+        if (question.questionCode?.trim()) {
+          drawCodeBlock(
+            sanitize(question.questionCode),
+            sanitize(question.codeLanguage || ""),
+          );
+        }
+
+        // Image
+        if (question.questionImage) {
+          try {
+            const imageUrl = `https://study-stream-api.onrender.com/${question.questionImage}`;
+            const imageData = await toDataURL(imageUrl);
+
+            const imageWidth = 80;
+            const imageHeight = 50;
+
+            addPageIfNeeded(imageHeight + 8);
+
+            pdf.addImage(
+              imageData,
+              "JPEG",
+              marginLeft,
+              y,
+              imageWidth,
+              imageHeight,
+            );
+
+            y += imageHeight + 8;
+          } catch (error) {
+            console.log("Image load failed:", error);
+          }
+        }
+
+        // Options
+        const correctAnswer = Number(question.correctAnswer);
+
+        (question.options || []).forEach((option: any, optionIndex: number) => {
+          const optionText =
+            typeof option === "string"
+              ? option
+              : option.text || option.label || option.value || "";
+
+          drawOption(optionText, optionIndex, optionIndex === correctAnswer);
+        });
+
+        y += 8;
+
+        // Separator after each question
+        setDrawColor([210, 210, 210]);
+
+        pdf.line(marginLeft, y, pageWidth - marginRight, y);
 
         y += 8;
       }
 
-      // ================= IMAGE =================
-      if (question.questionImage) {
-        try {
-          const imageUrl = `https://study-stream-api.onrender.com/${question.questionImage}`;
+      // ================= PAGE NUMBERS =================
+      const totalPages = pdf.getNumberOfPages();
 
-          const imageData = await toDataURL(imageUrl);
+      for (let pageNumber = 1; pageNumber <= totalPages; pageNumber++) {
+        pdf.setPage(pageNumber);
 
-          const imageWidth = 80;
-          const imageHeight = 50;
+        pdf.setFont("times", "normal");
+        pdf.setFontSize(8);
+        pdf.setTextColor(100, 100, 100);
 
-          addPageIfNeeded(imageHeight + 8);
-
-          pdf.addImage(
-            imageData,
-            "JPEG",
-            15,
-            y,
-            imageWidth,
-            imageHeight,
-          );
-
-          y += imageHeight + 8;
-        } catch (error) {
-          console.log("Image load failed:", error);
-        }
+        pdf.text(
+          `Page ${pageNumber} of ${totalPages}`,
+          pageWidth / 2,
+          pageHeight - 8,
+          {
+            align: "center",
+          },
+        );
       }
 
-      // ================= OPTIONS =================
-      pdf.setFontSize(12);
+      // ================= SAVE PDF =================
+      pdf.save(`${sanitize(quiz.title || "quiz")}.pdf`);
 
-      (question.options || []).forEach(
-        (option: string, index: number) => {
-          const isCorrect =
-            index === Number(question.correctAnswer);
-
-          const optionText = `${String.fromCharCode(
-            65 + index,
-          )}. ${sanitizeText(option)}`;
-
-          const optionLines = pdf.splitTextToSize(
-            optionText,
-            170,
-          );
-
-          addPageIfNeeded(optionLines.length * 6 + 2);
-
-          pdf.setFont(
-            "times",
-            isCorrect ? "bold" : "normal",
-          );
-
-          pdf.text(optionLines, 25, y);
-
-          y += optionLines.length * 6 + 2;
-        },
-      );
-
-      // Space after each question
-      y += 10;
+      toast.success("PDF exported successfully");
+    } catch (error) {
+      console.log("PDF export error:", error);
+      toast.error("Failed to export PDF");
     }
-
-    // ================= SAVE PDF =================
-    pdf.save(`${sanitizeText(quiz.title || "quiz")}.pdf`);
-
-    toast.success("PDF exported successfully");
-  } catch (error) {
-    console.log("PDF export error:", error);
-
-    toast.error("Failed to export PDF");
-  }
-};
+  };
 
   //api call of dashboard stats
   const fetchDashboard = async () => {
