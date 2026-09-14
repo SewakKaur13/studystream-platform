@@ -209,7 +209,7 @@ const ResultPage = () => {
               </div>
 
               {/* Download PDF */}
-              <div className="mb-8 flex justify-center">
+              {/* <div className="mb-8 flex justify-center">
                 <Button
                   onClick={downloadPDF}
                   variant="outline"
@@ -218,7 +218,7 @@ const ResultPage = () => {
                   <FileDown className="mr-2 h-4 w-4" />
                   Download PDF
                 </Button>
-              </div>
+              </div> */}
 
               {/* Questions Review */}
               <div className="space-y-6"></div>
