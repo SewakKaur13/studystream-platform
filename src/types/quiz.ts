@@ -1,11 +1,20 @@
 export interface Question {
-  id: string;
+  id?: string;
+  _id?: string;
+
   text: string;
+  questionText?: string;
+
   options: string[];
-  correctAnswer: number; // index
-  imageFile?: File | null;     // for upload
-  imagePreview?: string | null; // for UI preview
-  questionImage?: string | null; // for existing (edit mode)
+
+  correctAnswer: number; // zero-based option index
+
+  questionCode?: string;
+  codeLanguage?: string;
+
+  imageFile?: File | null;
+  imagePreview?: string | null;
+  questionImage?: string | null;
 }
 
 export interface Quiz {
@@ -25,11 +34,21 @@ export interface QuizDetail {
   description: string;
   duration: number;
   marksPerQuestion: number;
+
   questions: {
-    id: string;
+    id?: string;
+    _id?: string;
+
     text: string;
+    questionText?: string;
+
+    questionCode?: string;
+    codeLanguage?: string;
+
     options: string[];
     correctAnswer: number;
+
+    questionImage?: string | null;
   }[];
 }
 
@@ -38,7 +57,9 @@ export interface QuizAttempt {
   quizId: string;
   quizTitle: string;
   studentId: string;
+
   answers: Record<string, number>; // questionId -> selected option index
+
   score: number;
   totalMarks: number;
   correctCount: number;

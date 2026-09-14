@@ -12,6 +12,7 @@ const {
   getRecentAttempts,
   getStudentProgress,
   lockQuiz,
+  getResultPDFData
 } = require("../controllers/studentController");
 
 router.get("/dashboard", verifyUser, getStudentDashboard);
@@ -23,5 +24,6 @@ router.get("/result/:attemptId", verifyUser, getQuizResult);
 router.get("/recent-attempts", verifyUser, getRecentAttempts);
 router.get("/progress", verifyUser, getStudentProgress);
 router.post("/lock-quiz", verifyUser, lockQuiz);
+router.get("/quiz-result-pdf/:attemptId", verifyUser, getResultPDFData);
 
 module.exports = router;

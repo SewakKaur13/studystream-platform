@@ -38,6 +38,7 @@ const QuizPage = () => {
   const [tabSwitches, setTabSwitches] = useState(0);
   const tabSwitchRef = useRef(0);
   const submittedRef = useRef(false);
+  const violationInProgress = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [starting, setStarting] = useState(false);
   const [visited, setVisited] = useState<Record<string, boolean>>({});
@@ -64,10 +65,13 @@ const QuizPage = () => {
           title: data.title,
           marksPerQuestion: data.marksPerQuestion,
           description: data.description || "",
-          questions: (data.questions || [])?.map((q: any) => ({
+          questions: (data.questions || []).map((q: any) => ({
             id: q._id,
-            text: q.questionText,
-            options: q.options,
+            text: q.questionText || q.text || "",
+            questionText: q.questionText || q.text || "",
+            questionCode: q.questionCode || "",
+            codeLanguage: q.codeLanguage || "text",
+            options: q.options || [],
             correctAnswer: 0,
             questionImage: q.questionImage || null,
           })),
@@ -143,65 +147,20 @@ const QuizPage = () => {
     return () => clearInterval(timer);
   }, [started, timeLeft, quiz, submitQuiz]);
 
-  /** Enable fullscreen when quiz starts */
-  useEffect(() => {
-    if (started) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    }
-  }, [started]);
-
   /** Tab switch / focus loss detection */
   useEffect(() => {
     if (!started || !attemptId || !quiz) return;
 
-    const handleViolation = async () => {
-      tabSwitchRef.current += 1;
-      setTabSwitches(tabSwitchRef.current);
-
-      try {
-        // inform backend that tab switch happened
-        await api.post("/student/tab-switch", { attemptId });
-      } catch (err) {
-        console.error("Tab switch API failed", err);
-      }
-
-      // If student switches tabs 3 times
-      if (tabSwitchRef.current >= 3) {
-        try {
-          // call backend to lock quiz for 12 hours
-          await api.post("/student/lock-quiz", {
-            quizId: quiz._id,
-          });
-
-          toast.error(
-            "You switched tabs 3 times. Quiz locked for 2 hours and auto-submitted.",
-          );
-        } catch (err) {
-          console.error("Failed to lock quiz", err);
-        }
-
-        // auto submit quiz
-        submitQuiz(true);
-      } else {
-        toast.warning(
-          `Warning: Tab switch ${tabSwitchRef.current}/3. Quiz will auto-submit at 3.`,
-        );
-      }
-    };
-
-    /** Detect tab change */
     const handleVisibilityChange = () => {
       if (document.hidden) {
         handleViolation();
       }
     };
 
-    /** Detect window losing focus */
     const handleBlur = () => {
       handleViolation();
     };
 
-    /** Detect exiting fullscreen */
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement) {
         handleViolation();
@@ -209,15 +168,64 @@ const QuizPage = () => {
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
+
     window.addEventListener("blur", handleBlur);
+
     document.addEventListener("fullscreenchange", handleFullscreenChange);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+
       window.removeEventListener("blur", handleBlur);
+
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
   }, [started, attemptId, quiz, submitQuiz]);
+
+  const handleViolation = async () => {
+    if (violationInProgress.current || submittedRef.current) {
+      return;
+    }
+
+    violationInProgress.current = true;
+
+    tabSwitchRef.current += 1;
+    setTabSwitches(tabSwitchRef.current);
+
+    try {
+      await api.post("/student/tab-switch", {
+        attemptId,
+      });
+    } catch (err) {
+      console.error("Tab switch API failed", err);
+    }
+
+    if (tabSwitchRef.current >= 3) {
+      try {
+        await api.post("/student/lock-quiz", {
+          quizId: quiz?._id,
+        });
+
+        toast.error(
+          "You switched tabs 3 times. Quiz locked and auto-submitted.",
+        );
+      } catch (err) {
+        console.error("Failed to lock quiz", err);
+      }
+
+      await submitQuiz(true);
+    } else {
+      toast.warning(
+        `Warning: Tab switch ${tabSwitchRef.current}/3. Quiz will auto-submit at 3.`,
+      );
+    }
+
+    // Prevent duplicate blur/visibility events
+    setTimeout(() => {
+      violationInProgress.current = false;
+    }, 500);
+  };
+
   /** Track visited questions */
   useEffect(() => {
     if (!quiz || !started) return;
@@ -275,14 +283,13 @@ const QuizPage = () => {
               </div>
               <Button
                 size="lg"
-                disabled={starting}
                 className="w-full gradient-hero text-primary-foreground"
                 onClick={() => {
-                  setStarting(true);
                   setStarted(true);
+                  document.documentElement.requestFullscreen().catch(() => {});
                 }}
               >
-                {starting ? "Starting..." : "Start Quiz"}
+                Start Quiz
               </Button>
             </CardContent>
           </Card>
@@ -459,6 +466,25 @@ const QuizPage = () => {
                   </>
                 );
               })()}
+
+              {/* QUESTION CODE */}
+              {q.questionCode?.trim() && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-muted-foreground">
+                      Code
+                    </p>
+
+                    <Badge variant="secondary">
+                      {q.codeLanguage || "text"}
+                    </Badge>
+                  </div>
+
+                  <pre className="max-h-[420px] overflow-x-auto whitespace-pre-wrap rounded-lg bg-muted p-4 font-mono text-sm leading-6">
+                    <code>{q.questionCode}</code>
+                  </pre>
+                </div>
+              )}
             </CardTitle>
           </CardHeader>
 

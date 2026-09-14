@@ -160,210 +160,339 @@ const AdminPanel = () => {
 
   // ================= EXPORT PDF =================
   const exportQuizPDF = async (quiz: any) => {
-    try {
-      if (!quiz || !quiz.questions) {
-        toast.error("Quiz data missing");
+  try {
+    if (!quiz || !quiz.questions) {
+      toast.error("Quiz data missing");
+      return;
+    }
 
-        return;
+    const pdf = new jsPDF("p", "mm", "a4");
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    let y = 20;
+
+    // ================= HELPER: PAGE BREAK =================
+    const addPageIfNeeded = (requiredHeight = 10) => {
+      if (y + requiredHeight > pageHeight - 20) {
+        pdf.addPage();
+        y = 20;
       }
+    };
 
-      const pdf = new jsPDF("p", "mm", "a4");
+    // ================= TITLE =================
+    pdf.setFont("times", "bold");
+    pdf.setFontSize(22);
 
-      const pageWidth = pdf.internal.pageSize.getWidth();
-
-      let y = 20;
-
-      // ================= TITLE =================
-      pdf.setFont("times", "bold");
-
-      pdf.setFontSize(22);
-
-      pdf.text(sanitizeText(quiz.title || "Quiz"), pageWidth / 2, y, {
+    pdf.text(
+      sanitizeText(quiz.title || "Quiz"),
+      pageWidth / 2,
+      y,
+      {
         align: "center",
-      });
+      },
+    );
 
-      y += 12;
+    y += 12;
 
-      // ================= DESCRIPTION =================
-      pdf.setFont("times", "bold");
+    // ================= DESCRIPTION =================
+    pdf.setFont("times", "bold");
+    pdf.setFontSize(12);
 
-      pdf.setFontSize(12);
+    const descriptionLines = pdf.splitTextToSize(
+      sanitizeText(quiz.description || ""),
+      170,
+    );
 
-      const descriptionLines = pdf.splitTextToSize(
-        sanitizeText(quiz.description || ""),
-        170,
+    pdf.text(descriptionLines, pageWidth / 2, y, {
+      align: "center",
+    });
+
+    y += descriptionLines.length * 6 + 10;
+
+    // ================= QUESTIONS =================
+    for (
+      let qIndex = 0;
+      qIndex < (quiz?.questions?.length || 0);
+      qIndex++
+    ) {
+      const question = quiz?.questions?.[qIndex];
+
+      if (!question) continue;
+
+      // ================= PAGE BREAK BEFORE QUESTION =================
+      addPageIfNeeded(20);
+
+      // ================= QUESTION TEXT =================
+      const rawText = sanitizeText(
+        question.text || question.questionText || "",
       );
 
-      pdf.text(descriptionLines, pageWidth / 2, y, {
-        align: "center",
-      });
+      // Split rows
+      const rows = rawText.split(";");
 
-      y += descriptionLines.length * 6 + 10;
+      // Table rows
+      const tableRows = rows.filter((row: string) =>
+        row.includes("|"),
+      );
 
-      // ================= QUESTIONS =================
-      for (let qIndex = 0; qIndex < (quiz?.questions?.length || 0); qIndex++) {
-        const question = quiz?.questions?.[qIndex];
+      // Normal rows
+      const normalText = rows.filter(
+        (row: string) => !row.includes("|"),
+      );
 
-        if (!question) continue;
-
-        // ================= PAGE BREAK =================
-        if (y > 240) {
-          pdf.addPage();
-
-          y = 20;
-        }
-
-        // ================= QUESTION TEXT =================
-        const rawText = sanitizeText(
-          question.text || question.questionText || "",
-        );
-
-        // Split rows
-        const rows = rawText.split(";");
-
-        // Table rows
-        const tableRows = rows.filter((r: string) => r.includes("|"));
-
-        // Normal rows
-        const normalText = rows.filter((r: string) => !r.includes("|"));
-
-        // ================= NORMAL QUESTION =================
+      // ================= NORMAL QUESTION =================
+      if (normalText.join(" ").trim()) {
         pdf.setFont("times", "bold");
-
         pdf.setFontSize(14);
 
-        const fullQuestionText = `${qIndex + 1}. ${normalText.join(" ")}`;
+        const fullQuestionText = `${qIndex + 1}. ${normalText.join(
+          " ",
+        )}`;
 
-        const questionLines = pdf.splitTextToSize(fullQuestionText, 180);
+        const questionLines = pdf.splitTextToSize(
+          fullQuestionText,
+          180,
+        );
+
+        addPageIfNeeded(questionLines.length * 7 + 5);
 
         pdf.text(questionLines, 15, y);
 
         y += questionLines.length * 7 + 5;
+      } else {
+        // If there is no normal text, still show the question number
+        pdf.setFont("times", "bold");
+        pdf.setFontSize(14);
 
-        // ================= TABLE =================
-        if (tableRows.length > 0) {
-          const startX = 15;
+        const questionNumber = `${qIndex + 1}.`;
 
-          const tableWidth = 180;
+        addPageIfNeeded(12);
 
-          const maxCols = Math.max(
-            ...tableRows.map((row: string) => row.split("|").length),
-          );
+        pdf.text(questionNumber, 15, y);
 
-          const colWidth = tableWidth / maxCols;
+        y += 10;
+      }
 
-          tableRows.forEach((row: string, rowIndex: number) => {
-            const cols = row.split("|").map((c) => sanitizeText(c.trim()));
+      // ================= CODE =================
+      if (question.questionCode?.trim()) {
+        addPageIfNeeded(25);
 
-            // Dynamic row height
-            let maxHeight = 10;
+        const codeLanguage = question.codeLanguage || "text";
 
-            const splitCols = cols.map((colText: string) => {
-              const splitText = pdf.splitTextToSize(colText, colWidth - 4);
+        pdf.setFont("times", "bold");
+        pdf.setFontSize(10);
 
-              const height = splitText.length * 5 + 4;
+        pdf.text(
+          `Code${codeLanguage !== "text" ? ` (${codeLanguage})` : ""}:`,
+          20,
+          y,
+        );
 
-              if (height > maxHeight) {
-                maxHeight = height;
-              }
+        y += 6;
 
-              return splitText;
-            });
+        pdf.setFont("courier", "normal");
+        pdf.setFontSize(9);
 
-            // Page break
-            if (y + maxHeight > 270) {
-              pdf.addPage();
+        const codeLines = pdf.splitTextToSize(
+          sanitizeText(question.questionCode),
+          165,
+        );
 
-              y = 20;
+        const codeLineHeight = 5;
+        const codeBlockHeight = codeLines.length * codeLineHeight + 6;
+
+        // Add a new page if the code block does not fit
+        if (y + codeBlockHeight > pageHeight - 20) {
+          pdf.addPage();
+          y = 20;
+        }
+
+        // Code block background
+        pdf.setFillColor(245, 245, 245);
+        pdf.rect(18, y - 4, 174, codeBlockHeight, "F");
+
+        // Code block border
+        pdf.setDrawColor(180, 180, 180);
+        pdf.rect(18, y - 4, 174, codeBlockHeight);
+
+        pdf.setTextColor(30, 30, 30);
+        pdf.text(codeLines, 22, y);
+
+        y += codeBlockHeight + 8;
+
+        // Restore normal PDF text settings
+        pdf.setTextColor(0, 0, 0);
+        pdf.setFont("times", "normal");
+        pdf.setFontSize(12);
+      }
+
+      // ================= TABLE =================
+      if (tableRows.length > 0) {
+        const startX = 15;
+        const tableWidth = 180;
+
+        const maxCols = Math.max(
+          ...tableRows.map(
+            (row: string) => row.split("|").length,
+          ),
+        );
+
+        const colWidth = tableWidth / maxCols;
+
+        tableRows.forEach((row: string, rowIndex: number) => {
+          const cols = row
+            .split("|")
+            .map((column: string) =>
+              sanitizeText(column.trim()),
+            );
+
+          // Calculate dynamic row height
+          let maxHeight = 10;
+
+          const splitCols = cols.map((columnText: string) => {
+            const splitText = pdf.splitTextToSize(
+              columnText,
+              colWidth - 4,
+            );
+
+            const height = splitText.length * 5 + 4;
+
+            if (height > maxHeight) {
+              maxHeight = height;
             }
 
-            cols.forEach((colText: string, colIndex: number) => {
+            return splitText;
+          });
+
+          // Page break before table row
+          if (y + maxHeight > pageHeight - 20) {
+            pdf.addPage();
+            y = 20;
+          }
+
+          cols.forEach(
+            (columnText: string, colIndex: number) => {
               const x = startX + colIndex * colWidth;
 
-              // Header bg
+              // Header background
               if (rowIndex === 0) {
                 pdf.setFillColor(230, 230, 230);
-
-                pdf.rect(x, y, colWidth, maxHeight, "F");
+                pdf.rect(
+                  x,
+                  y,
+                  colWidth,
+                  maxHeight,
+                  "F",
+                );
               }
 
-              // Border
-              pdf.rect(x, y, colWidth, maxHeight);
+              // Cell border
+              pdf.setDrawColor(0, 0, 0);
+              pdf.rect(
+                x,
+                y,
+                colWidth,
+                maxHeight,
+              );
 
-              // Font
-              pdf.setFont("times", rowIndex === 0 ? "bold" : "normal");
+              // Cell font
+              pdf.setFont(
+                "times",
+                rowIndex === 0 ? "bold" : "normal",
+              );
 
               pdf.setFontSize(9);
 
-              // Text
+              // Cell text
               const splitText = splitCols[colIndex];
 
               pdf.text(splitText, x + 2, y + 6, {
                 maxWidth: colWidth - 4,
                 align: "center",
               });
-            });
+            },
+          );
 
-            y += maxHeight;
-          });
+          y += maxHeight;
+        });
 
-          y += 8;
+        y += 8;
+      }
+
+      // ================= IMAGE =================
+      if (question.questionImage) {
+        try {
+          const imageUrl = `https://study-stream-api.onrender.com/${question.questionImage}`;
+
+          const imageData = await toDataURL(imageUrl);
+
+          const imageWidth = 80;
+          const imageHeight = 50;
+
+          addPageIfNeeded(imageHeight + 8);
+
+          pdf.addImage(
+            imageData,
+            "JPEG",
+            15,
+            y,
+            imageWidth,
+            imageHeight,
+          );
+
+          y += imageHeight + 8;
+        } catch (error) {
+          console.log("Image load failed:", error);
         }
+      }
 
-        // ================= IMAGE =================
-        if (question.questionImage) {
-          try {
-            const imageUrl = `https://study-stream-api.onrender.com/${question.questionImage}`;
+      // ================= OPTIONS =================
+      pdf.setFontSize(12);
 
-            const imageData = await toDataURL(imageUrl);
-
-            pdf.addImage(imageData, "JPEG", 15, y, 80, 50);
-
-            y += 58;
-          } catch (error) {
-            console.log("Image load failed:", error);
-          }
-        }
-
-        // ================= OPTIONS =================
-        (question.options || []).forEach((option: string, index: number) => {
-          if (y > 260) {
-            pdf.addPage();
-
-            y = 20;
-          }
-
-          const isCorrect = index === question.correctAnswer;
-
-          pdf.setFont("times", isCorrect ? "bold" : "normal");
-
-          pdf.setFontSize(12);
+      (question.options || []).forEach(
+        (option: string, index: number) => {
+          const isCorrect =
+            index === Number(question.correctAnswer);
 
           const optionText = `${String.fromCharCode(
             65 + index,
           )}. ${sanitizeText(option)}`;
 
-          const optionLines = pdf.splitTextToSize(optionText, 170);
+          const optionLines = pdf.splitTextToSize(
+            optionText,
+            170,
+          );
+
+          addPageIfNeeded(optionLines.length * 6 + 2);
+
+          pdf.setFont(
+            "times",
+            isCorrect ? "bold" : "normal",
+          );
 
           pdf.text(optionLines, 25, y);
 
           y += optionLines.length * 6 + 2;
-        });
+        },
+      );
 
-        y += 10;
-      }
-
-      // ================= SAVE PDF =================
-      pdf.save(`${sanitizeText(quiz.title || "quiz")}.pdf`);
-
-      toast.success("PDF exported successfully");
-    } catch (error) {
-      console.log(error);
-
-      toast.error("Failed to export PDF");
+      // Space after each question
+      y += 10;
     }
-  };
-  
+
+    // ================= SAVE PDF =================
+    pdf.save(`${sanitizeText(quiz.title || "quiz")}.pdf`);
+
+    toast.success("PDF exported successfully");
+  } catch (error) {
+    console.log("PDF export error:", error);
+
+    toast.error("Failed to export PDF");
+  }
+};
+
   //api call of dashboard stats
   const fetchDashboard = async () => {
     try {
@@ -421,20 +550,33 @@ const AdminPanel = () => {
       const res = await api.get(`/quiz/get-quiz/${id}`);
       const data = res.data;
 
-      const formatted = {
+      const formatted: QuizDetail = {
         _id: data._id,
         title: data.title,
         description: data.description,
         duration: data.duration,
         marksPerQuestion: data.marksPerQuestion,
-        questions: data.questions?.map((q: any, idx: number) => ({
-          id: q._id || `q_${idx}`, // generate id if not present
-          text: q.questionText, // map questionText → text
-          options: q.options,
-          correctAnswer: q.correctAnswer,
-          questionImage: q.questionImage || null,
-        })),
-        createdAt: data.createdAt,
+
+        questions:
+          data.questions?.map((q: any, idx: number) => ({
+            id: q._id || `q_${idx}`,
+
+            text: q.questionText || "",
+
+            questionCode: q.questionCode || "",
+
+            codeLanguage: q.codeLanguage || "text",
+
+            options: Array.isArray(q.options) ? q.options : ["", "", "", ""],
+
+            correctAnswer: Number(q.correctAnswer),
+
+            questionImage: q.questionImage || null,
+
+            imageFile: null,
+
+            imagePreview: null,
+          })) || [],
       };
 
       setEditQuiz(formatted);
@@ -847,18 +989,37 @@ const QuizForm = ({
     quiz?.questions
       ? quiz.questions.map((q: any) => ({
           ...q,
-          text: q.questionText || "",
+
+          text: q.questionText || q.text || "",
+
+          questionCode: q.questionCode || "",
+
+          codeLanguage: q.codeLanguage || "text",
+
           imageFile: null,
+
           imagePreview: null,
+
+          questionImage: q.questionImage || null,
         }))
       : [
           {
             id: `q_${Date.now()}`,
+
             text: "",
+
+            questionCode: "",
+
+            codeLanguage: "text",
+
             options: ["", "", "", ""],
+
             correctAnswer: 0,
+
             imageFile: null,
+
             imagePreview: null,
+
             questionImage: null,
           },
         ],
@@ -872,31 +1033,50 @@ const QuizForm = ({
       setMarksPerQuestion(quiz.marksPerQuestion || 2);
 
       setQuestions(
-        quiz.questions?.map((q: any) => ({
-          ...q,
+        quiz.questions?.map((q: any, index: number) => ({
+          id: q.id || q._id || `q_${index}`,
+
           text: q.text || q.questionText || "",
 
-          // IMPORTANT FIX FOR IMAGE
+          questionCode: q.questionCode || "",
+
+          codeLanguage: q.codeLanguage || "text",
+
+          options: Array.isArray(q.options) ? q.options : ["", "", "", ""],
+
+          correctAnswer: Number(q.correctAnswer),
+
           questionImage: q.questionImage || null,
 
           imageFile: null,
+
           imagePreview: null,
         })) || [],
       );
     }
   }, [quiz]);
-  console.log("quiz:", quiz);
-  console.log("questions state:", questions);
+
   const addQuestion = () => {
     setQuestions([
       ...questions,
+
       {
         id: `q_${Date.now()}_${questions.length}`,
+
         text: "",
+
+        questionCode: "",
+
+        codeLanguage: "text",
+
         options: ["", "", "", ""],
+
         correctAnswer: 0,
+
         imageFile: null,
+
         imagePreview: null,
+
         questionImage: null,
       },
     ]);
@@ -930,13 +1110,25 @@ const QuizForm = ({
     if (
       questions.some(
         (q) =>
-          (!q.text.trim() && !q.imageFile && !q.questionImage) ||
-          q.options.some((o) => !o.trim()),
+          !q.text.trim() &&
+          !q.questionCode?.trim() &&
+          !q.imageFile &&
+          !q.questionImage,
       )
     ) {
-      toast.error(
-        "Each question must have text or image and all options filled",
-      );
+      toast.error("Each question must have text, code, or image");
+      return;
+    }
+
+    if (
+      questions.some(
+        (q) =>
+          !Array.isArray(q.options) ||
+          q.options.length !== 4 ||
+          q.options.some((option) => !option.trim()),
+      )
+    ) {
+      toast.error("Each question must have exactly 4 options");
       return;
     }
 
@@ -948,15 +1140,30 @@ const QuizForm = ({
       // JSON data (without files)
       const quizPayload = {
         _id: quiz?._id,
+
         title: title.trim(),
+
         description: description.trim(),
+
         duration: timeLimit,
+
         marksPerQuestion,
+
         questions: questions.map((q) => ({
-          text: q.text,
+          text: q.text || "",
+
+          questionText: q.text || "",
+
+          questionCode: q.questionCode || "",
+
+          codeLanguage: q.codeLanguage || "text",
+
           options: q.options,
-          correctAnswer: q.correctAnswer,
-          questionImage: q.questionImage || null, // existing image
+
+          correctAnswer: Number(q.correctAnswer),
+
+          // Preserve existing image
+          questionImage: q.questionImage || null,
         })),
       };
 
@@ -1080,6 +1287,44 @@ const QuizForm = ({
               onChange={(e) => updateQuestion(qi, "text", e.target.value)}
               placeholder="Question text (use | for columns and ; for rows if table needed)"
             />
+            {/* Question Code Section */}
+            <div className="space-y-2">
+              <Label>Question Code</Label>
+
+              <Textarea
+                value={q.questionCode || ""}
+                onChange={(e) =>
+                  updateQuestion(qi, "questionCode", e.target.value)
+                }
+                placeholder="Enter code here, if required..."
+                className="min-h-[140px] font-mono text-sm"
+              />
+            </div>
+
+            {/* Code Language Section */}
+            <div className="space-y-2">
+              <Label>Code Language</Label>
+
+              <select
+                value={q.codeLanguage || "text"}
+                onChange={(e) =>
+                  updateQuestion(qi, "codeLanguage", e.target.value)
+                }
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="text">Plain Text</option>
+                <option value="java">Java</option>
+                <option value="javascript">JavaScript</option>
+                <option value="python">Python</option>
+                <option value="cpp">C++</option>
+                <option value="c">C</option>
+                <option value="sql">SQL</option>
+                <option value="html">HTML</option>
+                <option value="css">CSS</option>
+                <option value="dsa">DSA</option>
+                <option value="os">OS</option>
+              </select>
+            </div>
 
             {/* IMAGE UPLOAD SECTION */}
             <div className="space-y-2">

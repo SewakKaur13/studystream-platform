@@ -94,7 +94,6 @@ const startQuiz = async (req, res) => {
       });
     }
 
-    //ADD THIS LOCK CHECK HERE
     const lock = await QuizLock.findOne({
       studentId,
       quizId,
@@ -108,14 +107,12 @@ const startQuiz = async (req, res) => {
       });
     }
 
-    // Check existing attempt
     let attempt = await Attempt.findOne({
       studentId,
       quizId,
       status: "in-progress",
     });
 
-    // If no attempt → create new
     if (!attempt) {
       attempt = await Attempt.create({
         studentId,
@@ -126,26 +123,32 @@ const startQuiz = async (req, res) => {
       });
     }
 
-    // Shuffle ONLY once
     let questionsToSend;
 
     if (attempt.answers.length === 0) {
-      questionsToSend = quiz.questions
-        .sort(() => 0.5 - Math.random())
-        ?.map((q) => ({
-          _id: q._id,
-          questionText: q.questionText,
-          questionImage: q.questionImage || null,
-          options: q.options,
-        }));
-    } else {
-      questionsToSend = quiz.questions?.map((q) => ({
+      const shuffledQuestions = [...quiz.questions].sort(
+        () => 0.5 - Math.random(),
+      );
+
+      questionsToSend = shuffledQuestions.map((q) => ({
         _id: q._id,
-        questionText: q.questionText,
-        options: q.options,
+        questionText: q.questionText || q.text || "",
+        questionCode: q.questionCode || "",
+        codeLanguage: q.codeLanguage || "text",
         questionImage: q.questionImage || null,
+        options: q.options || [],
+      }));
+    } else {
+      questionsToSend = quiz.questions.map((q) => ({
+        _id: q._id,
+        questionText: q.questionText || q.text || "",
+        questionCode: q.questionCode || "",
+        codeLanguage: q.codeLanguage || "text",
+        questionImage: q.questionImage || null,
+        options: q.options || [],
       }));
     }
+
     res.json({
       attemptId: attempt._id,
       quizId: quiz._id,
@@ -156,6 +159,7 @@ const startQuiz = async (req, res) => {
     });
   } catch (error) {
     console.error("Start quiz error:", error);
+
     res.status(500).json({
       message: error.message,
     });
@@ -163,27 +167,86 @@ const startQuiz = async (req, res) => {
 };
 
 const saveAnswer = async (req, res) => {
-  const { attemptId, questionId, selectedOption } = req.body;
+  try {
+    const studentId = req.userId;
+    const { attemptId, questionId, selectedOption } = req.body;
 
-  const attempt = await Attempt.findById(attemptId);
+    if (
+      !attemptId ||
+      !questionId ||
+      selectedOption === undefined ||
+      selectedOption === null
+    ) {
+      return res.status(400).json({
+        message: "attemptId, questionId and selectedOption are required",
+      });
+    }
 
-  if (!attempt) {
-    return res.status(404).json({ message: "Attempt not found" });
+    const attempt = await Attempt.findOne({
+      _id: attemptId,
+      studentId,
+      status: "in-progress",
+    });
+
+    if (!attempt) {
+      return res.status(404).json({
+        message: "Active attempt not found",
+      });
+    }
+
+    const quiz = await Quiz.findById(attempt.quizId);
+
+    if (!quiz) {
+      return res.status(404).json({
+        message: "Quiz not found",
+      });
+    }
+
+    const question = quiz.questions.id(questionId);
+
+    if (!question) {
+      return res.status(404).json({
+        message: "Question not found",
+      });
+    }
+
+    const selectedOptionNumber = Number(selectedOption);
+
+    if (
+      !Number.isInteger(selectedOptionNumber) ||
+      selectedOptionNumber < 0 ||
+      selectedOptionNumber >= question.options.length
+    ) {
+      return res.status(400).json({
+        message: "Invalid option selected",
+      });
+    }
+
+    const existing = attempt.answers.find(
+      (answer) => answer.questionId.toString() === questionId.toString(),
+    );
+
+    if (existing) {
+      existing.selectedOption = selectedOptionNumber;
+    } else {
+      attempt.answers.push({
+        questionId,
+        selectedOption: selectedOptionNumber,
+      });
+    }
+
+    await attempt.save();
+
+    res.json({
+      message: "Answer saved",
+    });
+  } catch (error) {
+    console.error("Save answer error:", error);
+
+    res.status(500).json({
+      message: error.message,
+    });
   }
-
-  const existing = attempt.answers.find(
-    (a) => a.questionId.toString() === questionId,
-  );
-
-  if (existing) {
-    existing.selectedOption = selectedOption;
-  } else {
-    attempt.answers.push({ questionId, selectedOption });
-  }
-
-  await attempt.save();
-
-  res.json({ message: "Answer saved" });
 };
 
 const updateTabSwitch = async (req, res) => {
@@ -212,102 +275,267 @@ const updateTabSwitch = async (req, res) => {
 };
 
 const submitQuiz = async (req, res) => {
-  const { attemptId, autoSubmitted } = req.body;
+  try {
+    const studentId = req.userId;
+    const { attemptId, autoSubmitted = false } = req.body;
 
-  const attempt = await Attempt.findById(attemptId);
-  const quiz = await Quiz.findById(attempt.quizId);
+    const attempt = await Attempt.findOne({
+      _id: attemptId,
+      studentId,
+      status: "in-progress",
+    });
 
-  let score = 0;
-  let correct = 0;
-  let wrong = 0;
-
-  const resultDetails = [];
-
-  attempt.answers.forEach((ans) => {
-    const question = quiz.questions.id(ans.questionId);
-
-    const isCorrect = question.correctAnswer === ans.selectedOption;
-
-    if (isCorrect) {
-      score += quiz.marksPerQuestion;
-      correct++;
-    } else {
-      wrong++;
+    if (!attempt) {
+      return res.status(404).json({
+        message: "Active attempt not found",
+      });
     }
 
-    resultDetails.push({
-      questionText: question.questionText,
-      options: question.options,
-      selectedOption: ans.selectedOption,
-      correctAnswer: question.correctAnswer,
-      isCorrect,
-      questionImage: question.questionImage || null,
+    const quiz = await Quiz.findById(attempt.quizId);
+
+    if (!quiz) {
+      return res.status(404).json({
+        message: "Quiz not found",
+      });
+    }
+
+    let score = 0;
+    let correct = 0;
+    let wrong = 0;
+
+    const resultDetails = [];
+
+    quiz.questions.forEach((question) => {
+      const answer = attempt.answers.find(
+        (item) =>
+          item.questionId.toString() === question._id.toString(),
+      );
+
+      const selectedOption =
+        answer && answer.selectedOption !== undefined
+          ? Number(answer.selectedOption)
+          : null;
+
+      const correctAnswer = Number(question.correctAnswer);
+
+      const isCorrect =
+        selectedOption !== null &&
+        selectedOption === correctAnswer;
+
+      if (isCorrect) {
+        score += quiz.marksPerQuestion;
+        correct++;
+      } else if (selectedOption !== null) {
+        wrong++;
+      }
+
+      resultDetails.push({
+        questionId: question._id,
+
+        questionText:
+          question.questionText ||
+          question.text ||
+          "",
+
+        questionCode: question.questionCode || "",
+
+        codeLanguage: question.codeLanguage || "text",
+
+        questionImage: question.questionImage || null,
+
+        options: question.options || [],
+
+        selectedOption,
+
+        selectedAnswer:
+          selectedOption !== null &&
+          selectedOption >= 0 &&
+          selectedOption < question.options.length
+            ? question.options[selectedOption]
+            : "Not answered",
+
+        correctAnswer,
+
+        correctAnswerText:
+          correctAnswer >= 0 &&
+          correctAnswer < question.options.length
+            ? question.options[correctAnswer]
+            : "Not available",
+
+        isCorrect,
+      });
     });
-  });
 
-  attempt.score = score;
-  attempt.correctCount = correct;
-  attempt.wrongCount = wrong;
-  attempt.status = "completed";
-  attempt.submittedAt = new Date();
+    attempt.score = score;
+    attempt.correctCount = correct;
+    attempt.wrongCount = wrong;
+    attempt.status = "completed";
+    attempt.submittedAt = new Date();
+    attempt.autoSubmitted = Boolean(autoSubmitted);
 
-  await attempt.save();
+    await attempt.save();
 
-  // LOCK LOGIC
-  const lockDurationAuto = 12 * 60 * 60 * 1000;
-  const lockDurationManual = 24 * 60 * 60 * 1000;
+    const lockDurationAuto = 12 * 60 * 60 * 1000;
+    const lockDurationManual = 24 * 60 * 60 * 1000;
 
-  const lockDuration = autoSubmitted ? lockDurationAuto : lockDurationManual;
+    const lockDuration = autoSubmitted
+      ? lockDurationAuto
+      : lockDurationManual;
 
-  await QuizLock.findOneAndUpdate(
-    {
-      studentId: attempt.studentId,
-      quizId: attempt.quizId,
-    },
-    {
-      lockedUntil: new Date(Date.now() + lockDuration),
-    },
-    { upsert: true },
-  );
+    await QuizLock.findOneAndUpdate(
+      {
+        studentId: attempt.studentId,
+        quizId: attempt.quizId,
+      },
+      {
+        lockedUntil: new Date(Date.now() + lockDuration),
+      },
+      {
+        upsert: true,
+        new: true,
+      },
+    );
 
-  res.json({
-    obtainedMarks: score,
-    totalMarks: quiz.questions.length * quiz.marksPerQuestion,
-    correct,
-    wrong,
-    resultDetails,
-  });
+    const totalMarks =
+      quiz.questions.length * quiz.marksPerQuestion;
+
+    res.json({
+      attemptId: attempt._id,
+      quizId: quiz._id,
+      quizTitle: quiz.title,
+
+      obtainedMarks: score,
+      totalMarks,
+
+      correct,
+      wrong,
+
+      percentage: totalMarks
+        ? ((score / totalMarks) * 100).toFixed(2)
+        : "0.00",
+
+      autoSubmitted: Boolean(autoSubmitted),
+
+      resultDetails,
+    });
+  } catch (error) {
+    console.error("Submit quiz error:", error);
+
+    res.status(500).json({
+      message: error.message,
+    });
+  }
 };
 
 const getQuizResult = async (req, res) => {
-  const { attemptId } = req.params;
+  try {
+    const { attemptId } = req.params;
+    const studentId = req.userId;
 
-  const attempt = await Attempt.findById(attemptId);
-  const quiz = await Quiz.findById(attempt.quizId);
+    const attempt = await Attempt.findOne({
+      _id: attemptId,
+      studentId,
+      status: "completed",
+    });
 
-  const resultDetails = attempt.answers.map(ans => {
-    const question = quiz.questions.id(ans.questionId);
-    const isCorrect = question.correctAnswer === ans.selectedOption;
+    if (!attempt) {
+      return res.status(404).json({
+        message: "Completed attempt not found",
+      });
+    }
 
-    return {
-      questionText: question.questionText,
-      options: question.options,
-      selectedOption: ans.selectedOption,
-      correctAnswer: question.correctAnswer,
-      isCorrect,
-      questionImage: question.questionImage || null,
-    };
-  });
+    const quiz = await Quiz.findById(attempt.quizId);
 
-  res.json({
-    obtainedMarks: attempt.score,
-    totalMarks: quiz.questions.length * quiz.marksPerQuestion,
-    correct: attempt.correctCount,
-    wrong: attempt.wrongCount,
-    autoSubmitted: attempt.autoSubmitted,
-    resultDetails,
-    quizTitle: quiz.title,
-  });
+    if (!quiz) {
+      return res.status(404).json({
+        message: "Quiz not found",
+      });
+    }
+
+    const resultDetails = attempt.answers.map((answer) => {
+      const question = quiz.questions.id(answer.questionId);
+
+      if (!question) {
+        return null;
+      }
+
+      const selectedOptionIndex = Number(answer.selectedOption);
+      const correctOptionIndex = Number(question.correctAnswer);
+
+      const isCorrect =
+        selectedOptionIndex === correctOptionIndex;
+
+      return {
+        questionId: question._id,
+
+        questionText:
+          question.questionText ||
+          question.text ||
+          "",
+
+        questionCode: question.questionCode || "",
+
+        codeLanguage: question.codeLanguage || "text",
+
+        questionImage: question.questionImage || null,
+
+        options: question.options || [],
+
+        selectedOption: selectedOptionIndex,
+
+        selectedAnswer:
+          selectedOptionIndex >= 0 &&
+          selectedOptionIndex < question.options.length
+            ? question.options[selectedOptionIndex]
+            : "Not answered",
+
+        correctAnswer: correctOptionIndex,
+
+        correctAnswerText:
+          correctOptionIndex >= 0 &&
+          correctOptionIndex < question.options.length
+            ? question.options[correctOptionIndex]
+            : "Not available",
+
+        isCorrect,
+      };
+    }).filter(Boolean);
+
+    const totalMarks =
+      quiz.questions.length * quiz.marksPerQuestion;
+
+    const obtainedMarks = attempt.score || 0;
+
+    const percentage = totalMarks
+      ? ((obtainedMarks / totalMarks) * 100).toFixed(2)
+      : "0.00";
+
+    res.json({
+      attemptId: attempt._id,
+      quizId: quiz._id,
+      quizTitle: quiz.title,
+
+      obtainedMarks,
+      totalMarks,
+
+      correct: attempt.correctCount || 0,
+      wrong: attempt.wrongCount || 0,
+
+      percentage,
+
+      autoSubmitted: attempt.autoSubmitted || false,
+
+      completedAt: attempt.submittedAt,
+
+      resultDetails,
+    });
+  } catch (error) {
+    console.error("Get quiz result error:", error);
+
+    res.status(500).json({
+      message: error.message,
+    });
+  }
 };
 
 const getRecentAttempts = async (req, res) => {
@@ -469,6 +697,121 @@ const lockQuiz = async (req, res) => {
     res.status(500).json({ message: "Failed to lock quiz" });
   }
 };
+
+const getResultPDFData = async (req, res) => {
+  try {
+    const { attemptId } = req.params;
+    const studentId = req.userId;
+
+    const attempt = await Attempt.findOne({
+      _id: attemptId,
+      studentId,
+      status: "completed",
+    });
+
+    if (!attempt) {
+      return res.status(404).json({
+        message: "Completed attempt not found",
+      });
+    }
+
+    const quiz = await Quiz.findById(attempt.quizId);
+
+    if (!quiz) {
+      return res.status(404).json({
+        message: "Quiz not found",
+      });
+    }
+
+    const resultDetails = quiz.questions.map((question) => {
+      const answer = attempt.answers.find(
+        (item) =>
+          item.questionId.toString() ===
+          question._id.toString(),
+      );
+
+      const selectedOption = answer
+        ? Number(answer.selectedOption)
+        : -1;
+
+      const correctAnswer = Number(question.correctAnswer);
+
+      const selectedAnswer =
+        selectedOption >= 0 &&
+        selectedOption < question.options.length
+          ? question.options[selectedOption]
+          : "Not answered";
+
+      const correctAnswerText =
+        correctAnswer >= 0 &&
+        correctAnswer < question.options.length
+          ? question.options[correctAnswer]
+          : "Not available";
+
+      return {
+        questionId: question._id,
+
+        questionText:
+          question.questionText ||
+          question.text ||
+          "",
+
+        questionCode: question.questionCode || "",
+
+        codeLanguage: question.codeLanguage || "text",
+
+        questionImage: question.questionImage || null,
+
+        options: question.options || [],
+
+        selectedOption,
+
+        selectedAnswer,
+
+        correctAnswer,
+
+        correctAnswerText,
+
+        isCorrect:
+          selectedOption !== -1 &&
+          selectedOption === correctAnswer,
+      };
+    });
+
+    const totalMarks =
+      quiz.questions.length * quiz.marksPerQuestion;
+
+    const obtainedMarks = attempt.score || 0;
+
+    const percentage = totalMarks
+      ? ((obtainedMarks / totalMarks) * 100).toFixed(2)
+      : "0.00";
+
+    res.json({
+      attemptId: attempt._id,
+      quizId: quiz._id,
+      quizTitle: quiz.title,
+
+      obtainedMarks,
+      totalMarks,
+
+      correct: attempt.correctCount || 0,
+      wrong: attempt.wrongCount || 0,
+
+      percentage,
+
+      completedAt: attempt.submittedAt,
+
+      resultDetails,
+    });
+  } catch (error) {
+    console.error("Result PDF data error:", error);
+
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
 module.exports = {
   getStudentDashboard,
   startQuiz,
@@ -479,4 +822,5 @@ module.exports = {
   getRecentAttempts,
   getStudentProgress,
   lockQuiz,
+  getResultPDFData,
 };

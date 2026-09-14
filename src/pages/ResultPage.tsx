@@ -9,9 +9,12 @@ import {
   Trophy,
   ArrowLeft,
   AlertTriangle,
+  FileDown,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import api from "@/api/axios";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 interface ResultDetail {
   questionText: string;
@@ -30,6 +33,7 @@ interface QuizResult {
   autoSubmitted?: boolean;
   resultDetails: ResultDetail[];
   quizTitle?: string;
+  studentName?: string;
 }
 
 const ResultPage = () => {
@@ -52,11 +56,6 @@ const ResultPage = () => {
     };
     fetchResult();
   }, [attemptId, result]);
-
-  useEffect(() => {
-  console.log("FULL RESULT:", result);
-  console.log("RESULT DETAILS:", result?.resultDetails);
-}, [result]);
 
   if (!result)
     return (
@@ -87,8 +86,41 @@ const ResultPage = () => {
         ? "text-warning"
         : "text-destructive";
 
+  const downloadPDF = async () => {
+    if (!attemptId) {
+      console.error("Attempt ID is missing");
+      return;
+    }
+
+    try {
+      const response = await api.get(`/student/quiz-result-pdf/${attemptId}`, {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([response.data], {
+        type: "application/pdf",
+      });
+
+      const pdfUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = pdfUrl;
+      link.download = `${result.studentName?.trim().split(/\s+/)[0] || "Student"}_${
+        result.quizTitle || "Quiz_Result"
+      }.pdf`;
+
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(pdfUrl);
+    } catch (error) {
+      console.error("PDF download failed:", error);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-background">
+    <div id="result-pdf" className="min-h-screen bg-background">
       <Navbar />
       <div className="container max-w-3xl py-12 space-y-8">
         <motion.div
@@ -162,6 +194,21 @@ const ResultPage = () => {
                   <p className="text-xs text-muted-foreground">Wrong</p>
                 </div>
               </div>
+
+              {/* Download PDF */}
+              <div className="mb-8 flex justify-center">
+                <Button
+                  onClick={downloadPDF}
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Download PDF
+                </Button>
+              </div>
+
+              {/* Questions Review */}
+              <div className="space-y-6"></div>
 
               {/* Questions Review */}
               <div className="space-y-6">
