@@ -87,37 +87,50 @@ const ResultPage = () => {
         : "text-destructive";
 
   const downloadPDF = async () => {
-    if (!attemptId) {
-      console.error("Attempt ID is missing");
-      return;
-    }
+  if (!attemptId) {
+    console.error("Attempt ID is missing");
+    return;
+  }
 
-    try {
-      const response = await api.get(`/student/quiz-result-pdf/${attemptId}`, {
+  try {
+    const response = await api.get(
+      `/student/quiz-result-pdf/${attemptId}`,
+      {
         responseType: "blob",
-      });
+      },
+    );
 
-      const blob = new Blob([response.data], {
-        type: "application/pdf",
-      });
+    const contentType = response.headers["content-type"] || "";
 
-      const pdfUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
+    if (!contentType.includes("application/pdf")) {
+      const errorText = await response.data.text();
 
-      link.href = pdfUrl;
-      link.download = `${result.studentName?.trim().split(/\s+/)[0] || "Student"}_${
-        result.quizTitle || "Quiz_Result"
-      }.pdf`;
+      console.error("Backend did not return a PDF:", errorText);
 
-      document.body.appendChild(link);
-      link.click();
-
-      link.remove();
-      window.URL.revokeObjectURL(pdfUrl);
-    } catch (error) {
-      console.error("PDF download failed:", error);
+      throw new Error("Backend returned an invalid PDF response");
     }
-  };
+
+    const pdfBlob = new Blob([response.data], {
+      type: "application/pdf",
+    });
+
+    const pdfUrl = window.URL.createObjectURL(pdfBlob);
+    const link = document.createElement("a");
+
+    link.href = pdfUrl;
+    link.download = `${(
+      result.studentName?.trim().split(/\s+/)[0] || "Student"
+    )}_${result.quizTitle || "Quiz_Result"}.pdf`;
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    window.URL.revokeObjectURL(pdfUrl);
+  } catch (error) {
+    console.error("PDF download failed:", error);
+  }
+};
 
   return (
     <div id="result-pdf" className="min-h-screen bg-background">

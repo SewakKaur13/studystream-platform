@@ -1,6 +1,7 @@
 const Quiz = require("../models/Quiz");
 const Attempt = require("../models/Attempt");
 const QuizLock = require("../models/QuizLock");
+import PDFDocument from "pdfkit";
 
 const getStudentDashboard = async (req, res) => {
   try {
@@ -827,6 +828,130 @@ const getResultPDFData = async (req, res) => {
     });
   }
 };
+
+const downloadQuizResultPDF = async (req, res) => {
+  try {
+    const { attemptId } = req.params;
+    const studentId = req.userId;
+
+    const attempt = await Attempt.findOne({
+      _id: attemptId,
+      studentId,
+      status: "completed",
+    });
+
+    if (!attempt) {
+      return res.status(404).json({
+        message: "Completed attempt not found",
+      });
+    }
+
+    const quiz = await Quiz.findById(attempt.quizId);
+
+    if (!quiz) {
+      return res.status(404).json({
+        message: "Quiz not found",
+      });
+    }
+
+    const totalMarks =
+      quiz.questions.length * quiz.marksPerQuestion;
+
+    const obtainedMarks = attempt.score || 0;
+
+    const percentage = totalMarks
+      ? ((obtainedMarks / totalMarks) * 100).toFixed(2)
+      : "0.00";
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="Quiz_Result_${attemptId}.pdf"`,
+    );
+
+    const doc = new PDFDocument({
+      margin: 40,
+      size: "A4",
+    });
+
+    doc.pipe(res);
+
+    doc.fontSize(20).text("Quiz Result", {
+      align: "center",
+    });
+
+    doc.moveDown();
+
+    doc.fontSize(14).text(`Quiz: ${quiz.title || "Quiz"}`);
+    doc.text(`Score: ${obtainedMarks}/${totalMarks}`);
+    doc.text(`Correct: ${attempt.correctCount || 0}`);
+    doc.text(`Wrong: ${attempt.wrongCount || 0}`);
+    doc.text(`Percentage: ${percentage}%`);
+    doc.text(
+      `Completed At: ${
+        attempt.submittedAt
+          ? new Date(attempt.submittedAt).toLocaleString()
+          : "N/A"
+      }`,
+    );
+
+    doc.moveDown();
+    doc.fontSize(16).text("Question Review");
+    doc.moveDown();
+
+    quiz.questions.forEach((question, index) => {
+      const answer = attempt.answers.find(
+        (item) =>
+          item.questionId.toString() === question._id.toString(),
+      );
+
+      const selectedOption = answer
+        ? Number(answer.selectedOption)
+        : -1;
+
+      const correctAnswer = Number(question.correctAnswer);
+
+      const selectedText =
+        selectedOption >= 0 &&
+        selectedOption < question.options.length
+          ? question.options[selectedOption]
+          : "Not answered";
+
+      const correctText =
+        correctAnswer >= 0 &&
+        correctAnswer < question.options.length
+          ? question.options[correctAnswer]
+          : "Not available";
+
+      doc
+        .fontSize(11)
+        .text(`${index + 1}. ${question.questionText || ""}`);
+
+      doc.text(`Your answer: ${selectedText}`);
+      doc.text(`Correct answer: ${correctText}`);
+      doc.text(
+        selectedOption === correctAnswer ? "Result: Correct" : "Result: Wrong",
+      );
+
+      doc.moveDown();
+
+      if (doc.y > 730) {
+        doc.addPage();
+      }
+    });
+
+    doc.end();
+  } catch (error) {
+    console.error("PDF generation error:", error);
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        message: error.message,
+      });
+    }
+  }
+};
+
 module.exports = {
   getStudentDashboard,
   startQuiz,
@@ -838,4 +963,5 @@ module.exports = {
   getStudentProgress,
   lockQuiz,
   getResultPDFData,
+  downloadQuizResultPDF,
 };
