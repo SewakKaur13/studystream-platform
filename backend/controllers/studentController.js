@@ -1,7 +1,7 @@
 const Quiz = require("../models/Quiz");
 const Attempt = require("../models/Attempt");
 const QuizLock = require("../models/QuizLock");
-import PDFDocument from "pdfkit";
+const PDFDocument = require("pdfkit");
 
 const getStudentDashboard = async (req, res) => {
   try {
