@@ -42,6 +42,11 @@ const attemptSchema = new mongoose.Schema({
     default: 0,
   },
 
+  autoSubmitted: {
+    type: Boolean,
+    default: false,
+  },
+
   status: {
     type: String,
     enum: ["in-progress", "completed", "terminated"],

@@ -250,28 +250,43 @@ const saveAnswer = async (req, res) => {
 };
 
 const updateTabSwitch = async (req, res) => {
-  const { attemptId } = req.body;
+  try {
+    const { attemptId } = req.body;
+    const studentId = req.userId;
 
-  const attempt = await Attempt.findById(attemptId);
+    if (!attemptId) {
+      return res.status(400).json({
+        message: "Attempt ID is required",
+      });
+    }
 
-  attempt.tabSwitchCount += 1;
+    const attempt = await Attempt.findOne({
+      _id: attemptId,
+      studentId,
+      status: "in-progress",
+    });
 
-  if (attempt.tabSwitchCount >= 3) {
-    attempt.status = "terminated";
-    attempt.submittedAt = new Date();
+    if (!attempt) {
+      return res.status(404).json({
+        message: "Active attempt not found",
+      });
+    }
+
+    attempt.tabSwitchCount += 1;
 
     await attempt.save();
 
-    return res.json({
-      autoSubmit: true,
+    res.json({
+      tabSwitchCount: attempt.tabSwitchCount,
+      autoSubmit: attempt.tabSwitchCount >= 3,
+    });
+  } catch (error) {
+    console.error("Tab switch error:", error);
+
+    res.status(500).json({
+      message: error.message,
     });
   }
-
-  await attempt.save();
-
-  res.json({
-    tabSwitchCount: attempt.tabSwitchCount,
-  });
 };
 
 const submitQuiz = async (req, res) => {

@@ -110,7 +110,9 @@ const QuizPage = () => {
   /** Submit Quiz */
   const submitQuiz = useCallback(
     async (auto = false) => {
-      if (submittedRef.current || !quiz || !attemptId) return;
+      if (submittedRef.current || !quiz || !attemptId || isSubmitting) {
+        return;
+      }
 
       submittedRef.current = true;
       setIsSubmitting(true);
@@ -126,14 +128,19 @@ const QuizPage = () => {
           auto ? "Quiz auto-submitted!" : "Quiz submitted successfully",
         );
 
-        navigate(`/result/${attemptId}`, { state: { result: res.data } });
+        navigate(`/result/${attemptId}`, {
+          state: { result: res.data },
+        });
       } catch (err: any) {
-        toast.error("Failed to submit quiz");
+        console.error("Submit error:", err.response?.data || err);
+
         submittedRef.current = false;
         setIsSubmitting(false);
+
+        toast.error(err.response?.data?.message || "Failed to submit quiz");
       }
     },
-    [quiz, answers, attemptId, navigate],
+    [quiz, answers, attemptId, navigate, isSubmitting],
   );
 
   /** Timer */
